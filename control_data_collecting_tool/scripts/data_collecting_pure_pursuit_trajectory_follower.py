@@ -131,7 +131,7 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
 
         self.declare_parameter(
             "acc_noise_amp",
-            0.00,
+            0.1,
             ParameterDescriptor(description="Accel cmd additional sine noise amplitude [m/ss]"),
         )
 

@@ -233,7 +233,7 @@ class DataCollectingTrajectoryPublisher(Node):
 
         self.declare_parameter(
             "yaw_error_threshold",
-            0.75,
+            2.00,
             ParameterDescriptor(
                 description="Yaw error threshold where applying velocity limit [rad]"
             ),
