@@ -20,8 +20,6 @@ from geometry_msgs.msg import AccelWithCovarianceStamped
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import PolygonStamped
 import matplotlib.pyplot as plt
-#import matplotlib.style as mplstyle
-#mplstyle.use('fast')
 from nav_msgs.msg import Odometry
 import numpy as np
 from numpy import arctan
@@ -492,7 +490,7 @@ class DataCollectingTrajectoryPublisher(Node):
 
         self.timer_period_callback = 0.03  # 30ms
         self.traj_step = 0.1
-        self.timer = self.create_timer(self.timer_period_callback, self.timer_callback,callback_group=self.callback_group)
+        self.timer_traj = self.create_timer(self.timer_period_callback, self.timer_callback_traj, callback_group=self.callback_group)
 
         if data_counts_matplotlib_plot_flag:
             self.collected_data_counts_of_vel_acc_for_plot = np.zeros((self.num_bins_v, self.num_bins_a))
@@ -994,7 +992,7 @@ class DataCollectingTrajectoryPublisher(Node):
         self.plot_data_collection_grid()
         plt.pause(0.01)
 
-    def timer_callback(self):
+    def timer_callback_traj(self):
         if (
             self._present_kinematic_state is not None
             and self._present_acceleration is not None
