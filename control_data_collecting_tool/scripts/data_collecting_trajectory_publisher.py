@@ -20,26 +20,26 @@ from geometry_msgs.msg import AccelWithCovarianceStamped
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import PolygonStamped
 import matplotlib.pyplot as plt
+#import matplotlib.style as mplstyle
+#mplstyle.use('fast')
 from nav_msgs.msg import Odometry
 import numpy as np
 from numpy import arctan
 from numpy import cos
 from numpy import pi
 from numpy import sin
+import threading
 from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
 from scipy.spatial.transform import Rotation as R
 import seaborn as sns
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 
-debug_matplotlib_plot_flag = True
-Differential_Smoothing_Flag = True
-USE_CURVATURE_RADIUS_FLAG = False
-
-#COURSE_NAME = "eight_course"
-COURSE_NAME = "u_shaped_return"
+COURSE_NAME = "eight_course"
+#COURSE_NAME = "u_shaped_return"
 #COURSE_NAME = "straight_line_positive"
 #COURSE_NAME = "straight_line_negative"
 
@@ -49,6 +49,13 @@ NUM_BINS_A = 10
 V_NUB, V_MAX= 0.0, 11.2
 STEER_MIN, STEER_MAX = -1.0, 1.0
 A_MIN, A_MAX = -1.0, 1.0
+
+
+debug_matplotlib_plot_flag = False
+data_counts_matplotlib_plot_flag = True
+Differential_Smoothing_Flag = True
+USE_CURVATURE_RADIUS_FLAG = False
+
 
 def smooth_bounding(upper: np.ndarray, threshold: np.ndarray, x: np.ndarray):
     result = np.zeros(x.shape)
@@ -345,11 +352,6 @@ class DataCollectingTrajectoryPublisher(Node):
         self.steer_bin_centers = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
         self.a_bin_centers = (self.a_bins[:-1] + self.a_bins[1:]) / 2
 
-        self.fig, self.axs = plt.subplots(4, 1, figsize=(12, 20))
-        self.grid_update_time_interval = 5.0
-        self.last_grid_update_time = None
-        plt.ion()
-
         self.trajectory_parts = None
         self.trajectory_achievement_rates = None
 
@@ -366,8 +368,11 @@ class DataCollectingTrajectoryPublisher(Node):
         self.previouse_target_vel = 2.0
         self.deceleration_rate = 0.6
 
-        self.vel_hist = np.zeros(50)
-        self.acc_hist = np.zeros(50)
+        self.vel_hist = np.zeros(200)
+        self.acc_hist = np.zeros(200)
+
+        self.vel_hist_for_plot = np.zeros(200)
+        self.acc_hist_for_plot = np.zeros(200)
 
         self.declare_parameter(
             "wheel_base",
@@ -481,10 +486,31 @@ class DataCollectingTrajectoryPublisher(Node):
         )
         self.sub_data_collecting_area_
 
+
+        self.callback_group = ReentrantCallbackGroup()
+        self.lock = threading.Lock()
+
         self.timer_period_callback = 0.03  # 30ms
         self.traj_step = 0.1
+        self.timer = self.create_timer(self.timer_period_callback, self.timer_callback,callback_group=self.callback_group)
 
-        self.timer = self.create_timer(self.timer_period_callback, self.timer_callback)
+        if data_counts_matplotlib_plot_flag:
+            self.collected_data_counts_of_vel_acc_for_plot = np.zeros((self.num_bins_v, self.num_bins_a))
+            self.collected_data_counts_of_vel_steer_for_plot = np.zeros((self.num_bins_v, self.num_bins_steer))
+
+            self.v_bin_centers_for_plot = (self.v_bins[:-1] + self.v_bins[1:]) / 2
+            self.steer_bin_centers_for_plot = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
+            self.a_bin_centers_for_plot = (self.a_bins[:-1] + self.a_bins[1:]) / 2
+
+            self.fig, self.axs = plt.subplots(3, 1, figsize=(12, 20))
+            self.grid_update_time_interval = 2.0
+            plt.ion()
+
+            self.timer_plot = self.create_timer(self.grid_update_time_interval, self.timer_callback_plot, callback_group=self.callback_group)
+
+        if debug_matplotlib_plot_flag:
+            self.fig_debug, self.axs_debug = plt.subplots(figsize=(12, 6))
+            plt.ion()
 
         self._present_kinematic_state = None
         self._present_acceleration = None
@@ -895,84 +921,78 @@ class DataCollectingTrajectoryPublisher(Node):
 
     def plot_data_collection_grid(self):
         # do not update if enough time has not passed
+        '''
         if self.last_grid_update_time is not None:
             time_elapsed = self.get_clock().now() - self.last_grid_update_time
             if self.grid_update_time_interval > time_elapsed.nanoseconds / 1e9:
                 return
+        '''
+        self.axs[0].cla()
+        self.axs[0].scatter(self.acc_hist_for_plot, self.vel_hist_for_plot)
+        self.axs[0].plot(self.acc_hist_for_plot, self.vel_hist_for_plot)
+        self.axs[0].set_xlim([-2.0, 2.0])
+        self.axs[0].set_ylim([0.0, self.v_max + 1.0])
+        self.axs[0].set_xlabel("Acceleration")
+        self.axs[0].set_ylabel("Velocity")
 
         # update collected acceleration and velocity grid
+        for collection in self.axs[1].collections:
+            if collection.colorbar is not None:
+                collection.colorbar.remove()
+        self.axs[1].cla()
+
+        self.heatmap = sns.heatmap(
+            self.collected_data_counts_of_vel_acc_for_plot.T,
+            annot=True,
+            cmap="coolwarm",
+            xticklabels=np.round(self.v_bin_centers_for_plot, 2),
+            yticklabels=np.round(self.a_bin_centers_for_plot, 2),
+            ax=self.axs[1],
+            linewidths=0.1,
+            linecolor="gray",
+        )
+
+        self.axs[1].set_xlabel("Velocity bins")
+        self.axs[1].set_ylabel("Acceleration bins")
+
         for collection in self.axs[2].collections:
             if collection.colorbar is not None:
                 collection.colorbar.remove()
         self.axs[2].cla()
 
         self.heatmap = sns.heatmap(
-            self.collected_data_counts_of_vel_acc.T,
+            self.collected_data_counts_of_vel_steer_for_plot.T,
             annot=True,
             cmap="coolwarm",
-            xticklabels=np.round(self.v_bin_centers, 2),
-            yticklabels=np.round(self.a_bin_centers, 2),
+            xticklabels=np.round(self.v_bin_centers_for_plot, 2),
+            yticklabels=np.round(self.steer_bin_centers_for_plot, 2),
             ax=self.axs[2],
             linewidths=0.1,
             linecolor="gray",
         )
 
-        self.axs[2].set_xlabel("Velocity bins")
-        self.axs[2].set_ylabel("Acceleration bins")
-
-        for collection in self.axs[3].collections:
-            if collection.colorbar is not None:
-                collection.colorbar.remove()
-        self.axs[3].cla()
-
-        self.heatmap = sns.heatmap(
-            self.collected_data_counts_of_vel_steer.T,
-            annot=True,
-            cmap="coolwarm",
-            xticklabels=np.round(self.v_bin_centers, 2),
-            yticklabels=np.round(self.steer_bin_centers, 2),
-            ax=self.axs[3],
-            linewidths=0.1,
-            linecolor="gray",
-        )
-
         # update collected steer and velocity grid
-        self.axs[3].set_xlabel("Velocity bins")
-        self.axs[3].set_ylabel("Steer bins")
-
-        self.axs[1].cla()
-        self.axs[1].scatter(self.acc_hist, self.vel_hist)
-        self.axs[1].plot(self.acc_hist, self.vel_hist)
-        self.axs[1].set_xlim([-2.0, 2.0])
-        self.axs[1].set_ylim([0.0, self.v_max + 1.0])
-        self.axs[1].set_xlabel("Acceleration")
-        self.axs[1].set_ylabel("Velocity")
-        self.last_grid_update_time = self.get_clock().now()
-
-        data_collecting_area = np.array(
-            [
-                np.array(
-                    [
-                        self._data_collecting_area_polygon.polygon.points[i].x,
-                        self._data_collecting_area_polygon.polygon.points[i].y,
-                        self._data_collecting_area_polygon.polygon.points[i].z,
-                    ]
-                )
-                for i in range(4)
-            ]
-        )
-
-        l1 = np.sqrt(((data_collecting_area[0, :2] - data_collecting_area[1, :2]) ** 2).sum())
-        l2 = np.sqrt(((data_collecting_area[1, :2] - data_collecting_area[2, :2]) ** 2).sum())
-        l3 = np.sqrt(((data_collecting_area[2, :2] - data_collecting_area[3, :2]) ** 2).sum())
-        l4 = np.sqrt(((data_collecting_area[3, :2] - data_collecting_area[0, :2]) ** 2).sum())
-        la = (l1 + l3) / 2
-        lb = (l2 + l4) / 2
-        title_of_fig = "rectangle : (la,lb) = " + str((la, lb))
-        title_of_fig += "total num of data = " + str( np.sum(self.collected_data_counts_of_vel_acc) )
-        self.fig.suptitle(title_of_fig)
+        self.axs[2].set_xlabel("Velocity bins")
+        self.axs[2].set_ylabel("Steer bins")
 
         self.fig.canvas.draw()
+
+        plt.pause(0.005)
+
+    def timer_callback_plot(self):
+        with self.lock:
+            self.collected_data_counts_of_vel_acc_for_plot = self.collected_data_counts_of_vel_acc.copy()
+            self.collected_data_counts_of_vel_steer_for_plot = self.collected_data_counts_of_vel_steer.copy()
+
+            self.acc_hist_for_plot = self.acc_hist.copy()
+            self.vel_hist_for_plot = self.vel_hist.copy()
+
+            self.v_bin_centers_for_plot = self.v_bin_centers
+            self.steer_bin_centers_for_plot = self.steer_bin_centers
+            self.a_bin_centers_for_plot = self.a_bin_centers
+
+        self.plot_data_collection_grid()
+        plt.pause(0.01)
 
     def timer_callback(self):
         if (
@@ -995,11 +1015,12 @@ class DataCollectingTrajectoryPublisher(Node):
 
             # update velocity and acceleration bin if ego vehicle is moving
             if self._present_kinematic_state.twist.twist.linear.x > 1e-3:
-                self.count_observations(
-                    self._present_kinematic_state.twist.twist.linear.x,
-                    self._present_acceleration.accel.accel.linear.x,
-                    steer,
-                )
+                with self.lock:
+                    self.count_observations(
+                        self._present_kinematic_state.twist.twist.linear.x,
+                        self._present_acceleration.accel.accel.linear.x,
+                        steer,
+                    )
 
             # [0] update nominal target trajectory if changing related ros2 params
             target_longitudinal_velocity = (
@@ -1111,7 +1132,8 @@ class DataCollectingTrajectoryPublisher(Node):
             self.one_round_progress_rate = 1.0 * nearestIndex / len(trajectory_position_data)
 
             # set target velocity
-            target_vel = self.get_target_velocity(nearestIndex)
+            with self.lock:
+                target_vel = self.get_target_velocity(nearestIndex)
 
             trajectory_longitudinal_velocity_data = np.array(
                 [target_vel for _ in range(len(trajectory_longitudinal_velocity_data))]
@@ -1293,7 +1315,7 @@ class DataCollectingTrajectoryPublisher(Node):
             self.data_collecting_trajectory_marker_array_pub_.publish(marker_array)
 
             if debug_matplotlib_plot_flag:
-                self.axs[0].cla()
+                self.axs_debug.cla()
                 step_size_array = np.sqrt(
                     ((trajectory_position_data[1:] - trajectory_position_data[:-1]) ** 2).sum(
                         axis=1
@@ -1311,9 +1333,9 @@ class DataCollectingTrajectoryPublisher(Node):
                     timestamp[i] = timestamp[i - 1] + time_width_array[i - 1]
                 timestamp -= timestamp[nearestIndex]
 
-                self.axs[0].plot(0, present_linear_velocity[0], "o", label="current vel")
+                self.axs_debug.plot(0, present_linear_velocity[0], "o", label="current vel")
 
-                self.axs[0].plot(
+                self.axs_debug.plot(
                     timestamp[nearestIndex : nearestIndex + pub_traj_len],
                     trajectory_longitudinal_velocity_data_without_limit[
                         nearestIndex : nearestIndex + pub_traj_len
@@ -1321,32 +1343,31 @@ class DataCollectingTrajectoryPublisher(Node):
                     "--",
                     label="target vel before applying limit",
                 )
-                self.axs[0].plot(
+                self.axs_debug.plot(
                     timestamp[nearestIndex : nearestIndex + pub_traj_len],
                     lateral_acc_limit[nearestIndex : nearestIndex + pub_traj_len],
                     "--",
                     label="lateral acc limit (always)",
                 )
-                self.axs[0].plot(
+                self.axs_debug.plot(
                     timestamp[nearestIndex : nearestIndex + pub_traj_len],
                     velocity_limit_by_tracking_error * np.ones(pub_traj_len),
                     "--",
                     label="vel limit by tracking error (only when exceeding threshold)",
                 )
-                self.axs[0].plot(
+                self.axs_debug.plot(
                     timestamp[nearestIndex : nearestIndex + pub_traj_len],
                     trajectory_longitudinal_velocity_data[
                         nearestIndex : nearestIndex + pub_traj_len
                     ],
                     label="actual target vel",
                 )
-                self.axs[0].set_xlim([-0.5, 10.5])
-                self.axs[0].set_ylim([-0.5, 12.5])
+                self.axs_debug.set_xlim([-0.5, 10.5])
+                self.axs_debug.set_ylim([-0.5, 12.5])
 
-                self.axs[0].set_xlabel("future timestamp [s]")
-                self.axs[0].set_ylabel("longitudinal_velocity [m/s]")
-                self.axs[0].legend(fontsize=8)
-                self.plot_data_collection_grid()
+                self.axs_debug.set_xlabel("future timestamp [s]")
+                self.axs_debug.set_ylabel("longitudinal_velocity [m/s]")
+                self.axs_debug.legend(fontsize=8)
                 plt.pause(0.01)
 
 
