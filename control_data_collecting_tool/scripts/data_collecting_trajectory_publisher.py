@@ -150,7 +150,7 @@ class DataCollectingTrajectoryPublisher(Node):
 
         self.declare_parameter(
             "max_lateral_accel",
-            0.5,  # 0.3G
+            1.0,  # 0.3G
             ParameterDescriptor(description="Max lateral acceleration limit [m/ss]"),
         )
 
@@ -186,13 +186,13 @@ class DataCollectingTrajectoryPublisher(Node):
 
         self.declare_parameter(
             "target_longitudinal_velocity",
-            6.0,
+            2.0,
             ParameterDescriptor(description="Target longitudinal velocity [m/s]"),
         )
 
         self.declare_parameter(
             "longitudinal_velocity_noise_amp",
-            0.1,
+            0.01,
             ParameterDescriptor(
                 description="Target longitudinal velocity additional sine noise amplitude [m/s]"
             ),

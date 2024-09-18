@@ -66,13 +66,13 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
 
         self.declare_parameter(
             "lookahead_time",
-            1.5,
+            2.0,
             ParameterDescriptor(description="Pure pursuit lookahead length coef [m/(m/s)]"),
         )
 
         self.declare_parameter(
             "min_lookahead",
-            3.0,
+            2.0,
             ParameterDescriptor(description="Pure pursuit lookahead length intercept [m]"),
         )
 
@@ -131,7 +131,7 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
 
         self.declare_parameter(
             "acc_noise_amp",
-            0.05,
+            0.01,
             ParameterDescriptor(description="Accel cmd additional sine noise amplitude [m/ss]"),
         )
 
