@@ -1222,7 +1222,7 @@ class DataCollectingTrajectoryPublisher(Node):
             # [6-2] publish marker_array
             marker_array = MarkerArray()
 
-            # [6-2a] local trajectory
+            # [6-2a-1] local trajectory
             marker_traj1 = Marker()
             marker_traj1.type = 4
             marker_traj1.id = 1
@@ -1231,7 +1231,7 @@ class DataCollectingTrajectoryPublisher(Node):
             marker_traj1.action = marker_traj1.ADD
 
             marker_traj1.scale.x = 0.4
-            marker_traj1.scale.y = 0.0
+            marker_traj1.scale.y = 0.0 
             marker_traj1.scale.z = 0.0
 
             marker_traj1.color.a = 1.0
@@ -1252,12 +1252,50 @@ class DataCollectingTrajectoryPublisher(Node):
 
             marker_array.markers.append(marker_traj1)
 
+            # [6-2a-2]
+            marker_arrow = Marker()
+            marker_arrow.type = 4#marker_arrow.ARROW
+            marker_arrow.id = 2
+            marker_arrow.header.frame_id = "map"
+
+            marker_arrow.action = marker_arrow.ADD
+
+            marker_arrow.scale.x = 0.5
+            marker_arrow.scale.y = 2.5
+            marker_arrow.scale.z = 0.0
+
+            marker_arrow.color.a = 1.0
+            marker_arrow.color.r = 1.0
+            marker_arrow.color.g = 0.0
+            marker_arrow.color.b = 1.0
+
+            marker_arrow.lifetime.nanosec = 500000000
+            marker_arrow.frame_locked = True
+
+            tangent_vec = np.array([ tmp_traj.points[1].pose.position.x - tmp_traj.points[0].pose.position.x, tmp_traj.points[1].pose.position.y - tmp_traj.points[0].pose.position.y ])
+
+            marker_arrow.points = []
+
+            start_marker_point = Point()
+            start_marker_point.x = tmp_traj.points[0].pose.position.x 
+            start_marker_point.y = tmp_traj.points[0].pose.position.y
+            start_marker_point.z = 0.0
+            marker_arrow.points.append(start_marker_point)
+
+            end_marker_point = Point()
+            end_marker_point.x = tmp_traj.points[0].pose.position.x  + 5.0 * tangent_vec[0] / np.linalg.norm( tangent_vec )
+            end_marker_point.y = tmp_traj.points[0].pose.position.y  + 5.0 * tangent_vec[1] / np.linalg.norm( tangent_vec )
+            end_marker_point.z = 0.0
+            marker_arrow.points.append(end_marker_point)
+
+            marker_array.markers.append(marker_arrow)
+
             # [6-2b] whole trajectory
             marker_traj2 = Marker()
-            marker_traj2.type = 4
             marker_traj2.id = 0
             marker_traj2.header.frame_id = "map"
 
+            marker_traj2.type = 4
             marker_traj2.action = marker_traj2.ADD
 
             marker_traj2.scale.x = 0.2
