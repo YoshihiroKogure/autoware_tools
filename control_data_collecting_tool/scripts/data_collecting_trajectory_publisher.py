@@ -37,7 +37,6 @@ import seaborn as sns
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 
-
 debug_matplotlib_plot_flag = False
 data_counts_matplotlib_plot_flag = True
 Differential_Smoothing_Flag = True
@@ -286,7 +285,6 @@ class DataCollectingTrajectoryPublisher(Node):
     def __init__(self):
         super().__init__("data_collecting_trajectory_publisher")
 
-
         self.declare_parameter(
             "COURSE_NAME",
             "eight_course",
@@ -348,7 +346,6 @@ class DataCollectingTrajectoryPublisher(Node):
             1.0,
             ParameterDescriptor(description="Maximum acceleration in heatmap [m/ss]"),
         )
-
 
         self.declare_parameter(
             "wheel_base",
@@ -532,7 +529,6 @@ class DataCollectingTrajectoryPublisher(Node):
             self.collected_data_counts_of_vel_steer_for_plot = np.zeros(
                 (self.num_bins_v, self.num_bins_steer)
             )
-
 
             self.v_bin_centers_for_plot = (self.v_bins[:-1] + self.v_bins[1:]) / 2
             self.steer_bin_centers_for_plot = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
@@ -1033,7 +1029,7 @@ class DataCollectingTrajectoryPublisher(Node):
             self.v_bin_centers_for_plot = self.v_bin_centers
             self.steer_bin_centers_for_plot = self.steer_bin_centers
             self.a_bin_centers_for_plot = self.a_bin_centers
-            
+
         self.plot_data_collection_grid()
         plt.pause(0.01)
 
