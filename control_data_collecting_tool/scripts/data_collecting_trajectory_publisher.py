@@ -95,17 +95,30 @@ def get_eight_course_trajectory_points(
     parts = ["part" for _ in range(len(t_array.copy()))]
     i_end = t_array.shape[0]
 
+    amp = -1.0 * 0.0
+    hz = 2.0
+
+    def kappa_sin(A, C, x):
+        A = abs(A)
+        C = abs(C)
+        return A * C * C * abs(sin(C * x)) / (1 + A * A * C * C * cos(C * x) * cos(C * x)) ** 1.5
+
     for i, t in enumerate(t_array):
         if t > OB + BD + AD + AC + CO:
             i_end = i
             break
 
         if 0 <= t and t <= OB:
-            print(t)
-            x[i] = (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t / OB
-            y[i] = a * t / (2 * OB)
-            yaw[i] = θB
-            curve[i] = 1e-10
+            xy = np.array([0.0, -amp * np.sin(2 * hz * np.pi * t / OB - np.pi)])
+            theta = np.arctan2(
+                -amp * 2 * hz * np.pi / OB * np.cos(2 * hz * np.pi * t / OB - np.pi), 1.0
+            )
+            rot = np.array([[np.cos(θB), -np.sin(θB)], [np.sin(θB), np.cos(θB)]])
+            xy = rot @ xy
+            x[i] = (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t / OB + xy[0]
+            y[i] = a * t / (2 * OB) + xy[1]
+            yaw[i] = θB + theta
+            curve[i] = 1e-10 + kappa_sin(amp, 2 * hz * np.pi / OB, t)
             parts[i] = "linear_positive"
             achievement_rates[i] = t / (2 * OB) + 0.5
 
@@ -121,10 +134,20 @@ def get_eight_course_trajectory_points(
 
         if OB + BD <= t and t <= OB + BD + AD:
             t2 = t - (OB + BD)
-            x[i] = D[0] - (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t2 / OB
-            y[i] = D[1] + a * t2 / (2 * OB)
-            yaw[i] = np.pi - θB
-            curve[i] = 1e-10
+
+            xy = np.array([0.0, -amp * np.sin(2 * hz * np.pi * t2 / OB)])
+            theta = np.arctan2(-amp * 2 * hz * np.pi / OB * np.cos(2 * hz * np.pi * t2 / OB), 1.0)
+            rot = np.array(
+                [
+                    [np.cos(np.pi - θB), -np.sin(np.pi - θB)],
+                    [np.sin(np.pi - θB), np.cos(np.pi - θB)],
+                ]
+            )
+            xy = rot @ xy
+            x[i] = D[0] - (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t2 / OB + xy[0]
+            y[i] = D[1] + a * t2 / (2 * OB) + xy[1]
+            yaw[i] = np.pi - θB + theta
+            curve[i] = 1e-10 + kappa_sin(amp, 2 * hz * np.pi / OB, t2)
 
             parts[i] = "linear_negative"
             achievement_rates[i] = t2 / (2 * OB)
@@ -142,10 +165,16 @@ def get_eight_course_trajectory_points(
 
         if OB + BD + AD + AC <= t and t <= OB + BD + AD + AC + CO:
             t4 = t - (OB + BD + AD + AC)
-            x[i] = C[0] + (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t4 / OB
-            y[i] = C[1] + a * t4 / (2 * OB)
-            yaw[i] = θB
-            curve[i] = 1e-10
+
+            xy = np.array([0.0, amp * np.sin(2 * hz * np.pi * t4 / CO)])
+            theta = np.arctan2(amp * 2 * hz * np.pi / CO * np.cos(2 * hz * np.pi * t4), 1.0)
+            rot = np.array([[np.cos(θB), -np.sin(θB)], [np.sin(θB), np.cos(θB)]])
+            xy = rot @ xy
+
+            x[i] = C[0] + (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t4 / OB + xy[0]
+            y[i] = C[1] + a * t4 / (2 * OB) + xy[1]
+            yaw[i] = θB + theta
+            curve[i] = 1e-10 + kappa_sin(amp, 2 * hz * np.pi / OB, t4)
 
             parts[i] = "linear_positive"
             achievement_rates[i] = t4 / (2 * OB)
@@ -390,7 +419,7 @@ class DataCollectingTrajectoryPublisher(Node):
 
         self.declare_parameter(
             "mov_ave_window",
-            100,
+            50,
             ParameterDescriptor(description="Moving average smoothing window size"),
         )
 
@@ -487,16 +516,34 @@ class DataCollectingTrajectoryPublisher(Node):
             self.get_parameter("A_MAX").get_parameter_value().double_value,
         )
 
+        self.num_of_bins_mean_abs_steer_rate = 6
+        self.mean_abs_steer_rate_min, self.mean_abs_steer_rate_max = 0.0, 0.30
+        self.num_of_mean_abs_steer_rate_threshold = 600
+
         self.collected_data_counts_of_vel_acc = np.zeros((self.num_bins_v, self.num_bins_a))
         self.collected_data_counts_of_vel_steer = np.zeros((self.num_bins_v, self.num_bins_steer))
+        self.collected_data_counts_of_steer_rate = np.zeros(self.num_of_bins_mean_abs_steer_rate)
 
         self.v_bins = np.linspace(self.v_min, self.v_max, self.num_bins_v + 1)
         self.steer_bins = np.linspace(self.steer_min, self.steer_max, self.num_bins_steer + 1)
+        self.steer_rate_bins = np.linspace(
+            self.mean_abs_steer_rate_min,
+            self.mean_abs_steer_rate_max,
+            self.num_of_bins_mean_abs_steer_rate + 1,
+        )
         self.a_bins = np.linspace(self.a_min, self.a_max, self.num_bins_a + 1)
 
         self.v_bin_centers = (self.v_bins[:-1] + self.v_bins[1:]) / 2
         self.steer_bin_centers = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
+        self.steer_rate_bin_centers = (self.steer_rate_bins[:-1] + self.steer_rate_bins[1:]) / 2
         self.a_bin_centers = (self.a_bins[:-1] + self.a_bins[1:]) / 2
+
+        self.num_steer_rate_hist = 16
+        self.previous_steer = 0.0
+        self.steer_rate_hist = []
+
+        self.previous_acc = 0.0
+        self.data_collecting_jerk_threshold = 0.5
 
         self.trajectory_parts = None
         self.trajectory_achievement_rates = None
@@ -962,16 +1009,24 @@ class DataCollectingTrajectoryPublisher(Node):
         else:
             return True
 
-    def count_observations(self, v, a, steer):
+    def count_observations(self, v, a, steer, steer_rate_abs_mean):
         v_bin = np.digitize(v, self.v_bins) - 1
         steer_bin = np.digitize(steer, self.steer_bins) - 1
         a_bin = np.digitize(a, self.a_bins) - 1
 
         if 0 <= v_bin < self.num_bins_v and 0 <= a_bin < self.num_bins_a:
-            self.collected_data_counts_of_vel_acc[v_bin, a_bin] += 1
+            jerk = (a - self.previous_acc) / self.timer_period_callback
+            if abs(jerk) < self.data_collecting_jerk_threshold:
+                self.collected_data_counts_of_vel_acc[v_bin, a_bin] += 1
 
         if 0 <= v_bin < self.num_bins_v and 0 <= steer_bin < self.num_bins_steer:
             self.collected_data_counts_of_vel_steer[v_bin, steer_bin] += 1
+
+        if steer_rate_abs_mean is not None:
+            steer_rate_abs_mean_bin = np.digitize(steer_rate_abs_mean, self.steer_rate_bins) - 1
+            self.get_logger().info("steer_rate_abs_mean_bin: " + str(steer_rate_abs_mean_bin))
+            if 0 <= steer_rate_abs_mean_bin < self.num_of_bins_mean_abs_steer_rate:
+                self.collected_data_counts_of_steer_rate[steer_rate_abs_mean_bin] += 1
 
     def plot_data_collection_grid(self):
         self.axs[1].cla()
@@ -1034,13 +1089,28 @@ class DataCollectingTrajectoryPublisher(Node):
                 wheel_base * angular_z, self._present_kinematic_state.twist.twist.linear.x
             )
 
+            steer_rate = (steer - self.previous_steer) / self.timer_period_callback
+            self.steer_rate_hist.append(steer_rate)
+            if len(self.steer_rate_hist) > self.num_steer_rate_hist:
+                steer_rate_abs_mean = np.mean(abs(np.array(self.steer_rate_hist)))
+                self.steer_rate_hist.pop(0)
+            else:
+                steer_rate_abs_mean = None
+
             # update velocity and acceleration bin if ego vehicle is moving
             if self._present_kinematic_state.twist.twist.linear.x > 1e-3:
                 self.count_observations(
                     self._present_kinematic_state.twist.twist.linear.x,
                     self._present_acceleration.accel.accel.linear.x,
                     steer,
+                    steer_rate_abs_mean,
                 )
+                self.get_logger().info(
+                    f"Numpy array: {np.array2string(self.collected_data_counts_of_steer_rate)}"
+                )
+
+            self.previous_steer = steer
+            self.previous_acc = self._present_acceleration.accel.accel.linear.x
 
             # [0] update nominal target trajectory if changing related ros2 params
             target_longitudinal_velocity = (
@@ -1390,7 +1460,16 @@ class DataCollectingTrajectoryPublisher(Node):
                 msg = Bool()
                 msg.data = True
                 self.pub_stop_request_.publish(msg)
-                self.get_logger().info(f"Publishing: {msg.data}")
+
+            # [6-4] finish data collection
+            if (
+                np.min(self.collected_data_counts_of_steer_rate)
+                > self.num_of_mean_abs_steer_rate_threshold
+            ):
+                self.get_logger().info(
+                    "sufficient steer_rate data has been collected. np.min( self.collected_data_counts_of_steer_rate ) > "
+                    + str(self.num_of_mean_abs_steer_rate_threshold)
+                )
 
             if debug_matplotlib_plot_flag:
                 self.axs[0].cla()
