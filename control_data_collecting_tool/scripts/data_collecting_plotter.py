@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import array
+from collections import deque
 import threading
 
 from geometry_msgs.msg import AccelWithCovarianceStamped
@@ -140,11 +142,11 @@ class DataCollectingPlotter(Node):
         self.steer_bin_centers = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
         self.a_bin_centers = (self.a_bins[:-1] + self.a_bins[1:]) / 2
 
-        self.vel_hist = np.zeros(200)
-        self.acc_hist = np.zeros(200)
+        self.vel_hist = deque([0.0] * 200, maxlen=200)
+        self.acc_hist = deque([0.0] * 200, maxlen=200)
 
-        self.vel_hist_for_plot = np.zeros(200)
-        self.acc_hist_for_plot = np.zeros(200)
+        self.vel_hist_for_plot = array.array("f", [0.0] * 200)
+        self.acc_hist_for_plot = array.array("f", [0.0] * 200)
 
         # create callback groups
         self.callback_group = ReentrantCallbackGroup()
@@ -176,10 +178,6 @@ class DataCollectingPlotter(Node):
             (self.num_bins_v, self.num_bins_steer)
         )
 
-        self.v_bin_centers_for_plot = (self.v_bins[:-1] + self.v_bins[1:]) / 2
-        self.steer_bin_centers_for_plot = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
-        self.a_bin_centers_for_plot = (self.a_bins[:-1] + self.a_bins[1:]) / 2
-
     def onOdometry(self, msg):
         self._present_kinematic_state = msg
 
@@ -199,22 +197,22 @@ class DataCollectingPlotter(Node):
 
     def timer_callback_plotter(self):
         with self.lock:
-            self.collected_data_counts_of_vel_acc_for_plot = (
-                self.collected_data_counts_of_vel_acc.copy()
+            np.copyto(
+                self.collected_data_counts_of_vel_acc_for_plot,
+                self.collected_data_counts_of_vel_acc,
             )
-            self.collected_data_counts_of_vel_steer_for_plot = (
-                self.collected_data_counts_of_vel_steer.copy()
+            np.copyto(
+                self.collected_data_counts_of_vel_steer_for_plot,
+                self.collected_data_counts_of_vel_steer,
             )
 
-            self.acc_hist_for_plot = self.acc_hist.copy()
-            self.vel_hist_for_plot = self.vel_hist.copy()
+            for i, val in enumerate(self.acc_hist):
+                self.acc_hist_for_plot[i] = val
 
-            self.v_bin_centers_for_plot = self.v_bin_centers
-            self.steer_bin_centers_for_plot = self.steer_bin_centers
-            self.a_bin_centers_for_plot = self.a_bin_centers
+            for i, val in enumerate(self.vel_hist):
+                self.vel_hist_for_plot[i] = val
 
         self.plot_data_collection_grid()
-        plt.pause(0.01)
 
     def timer_callback_counter(self):
         if self._present_kinematic_state is not None and self._present_acceleration is not None:
@@ -237,10 +235,8 @@ class DataCollectingPlotter(Node):
                         current_steer,
                     )
 
-                    self.acc_hist[:-1] = 1.0 * self.acc_hist[1:]
-                    self.acc_hist[-1] = current_acc
-                    self.vel_hist[:-1] = 1.0 * self.vel_hist[1:]
-                    self.vel_hist[-1] = current_vel
+                    self.acc_hist.append(current_acc)
+                    self.vel_hist.append(current_vel)
 
     def plot_data_collection_grid(self):
         self.axs[0].cla()
@@ -261,8 +257,8 @@ class DataCollectingPlotter(Node):
             self.collected_data_counts_of_vel_acc_for_plot.T,
             annot=True,
             cmap="coolwarm",
-            xticklabels=np.round(self.v_bin_centers_for_plot, 2),
-            yticklabels=np.round(self.a_bin_centers_for_plot, 2),
+            xticklabels=np.round(self.v_bin_centers, 2),
+            yticklabels=np.round(self.a_bin_centers, 2),
             ax=self.axs[1],
             linewidths=0.1,
             linecolor="gray",
@@ -280,8 +276,8 @@ class DataCollectingPlotter(Node):
             self.collected_data_counts_of_vel_steer_for_plot.T,
             annot=True,
             cmap="coolwarm",
-            xticklabels=np.round(self.v_bin_centers_for_plot, 2),
-            yticklabels=np.round(self.steer_bin_centers_for_plot, 2),
+            xticklabels=np.round(self.v_bin_centers, 2),
+            yticklabels=np.round(self.steer_bin_centers, 2),
             ax=self.axs[2],
             linewidths=0.1,
             linecolor="gray",
@@ -293,7 +289,7 @@ class DataCollectingPlotter(Node):
 
         self.fig.canvas.draw()
 
-        plt.pause(0.01)
+        plt.pause(0.1)
 
 
 def main(args=None):
