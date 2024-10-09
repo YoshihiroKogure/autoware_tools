@@ -8,7 +8,9 @@ install(PROGRAMS
   scripts/data_collecting_pure_pursuit_trajectory_follower.py
   scripts/data_collecting_trajectory_publisher.py
   scripts/data_collecting_plotter.py
-  DESTINATION lib/${PROJECT_NAME}
+  scripts/data_collecting_rosbag_record.py
+  scripts/rosbag_play.py
+  DESTINATION lib/${PROJECT_NAME} 
 )
 
 install(

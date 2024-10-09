@@ -27,6 +27,9 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 import seaborn as sns
 
+import rosbag_play
+import os
+
 
 class DataCollectingPlotter(Node):
     def __init__(self):
@@ -180,6 +183,38 @@ class DataCollectingPlotter(Node):
         self.steer_bin_centers_for_plot = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
         self.a_bin_centers_for_plot = (self.a_bins[:-1] + self.a_bins[1:]) / 2
 
+        rosbag2_dir_list = [d for d in os.listdir("./") if os.path.isdir(os.path.join("./", d))]
+        self.load_rosbag_data(rosbag2_dir_list)
+
+
+    def load_rosbag_data(self, rosbag2_dir_list):
+
+        for rosbag2_dir in rosbag2_dir_list:
+            rosbag2_file = "./" + rosbag2_dir + "/" + rosbag2_dir + "_0.db3"
+            db3converter = rosbag_play.db3Converter(rosbag2_file)
+            
+            load_acc_topic = db3converter.load_db3('/localization/acceleration')
+            load_kinematic_topic = db3converter.load_db3('/localization/kinematic_state')
+            if load_acc_topic and load_kinematic_topic:
+                while True:
+                    acceleration = db3converter.read_msg('/localization/acceleration')
+                    kinematic_state = db3converter.read_msg('/localization/kinematic_state')
+                    if acceleration is None or kinematic_state is None:
+                        break
+
+                    angular_z = kinematic_state.twist.twist.angular.z
+                    wheel_base = self.get_parameter("wheel_base").get_parameter_value().double_value
+                    steer = arctan2(
+                        wheel_base * angular_z, kinematic_state.twist.twist.linear.x
+                    )
+
+                    if kinematic_state.twist.twist.linear.x > 1e-3:
+                        self.count_observations(
+                            kinematic_state.twist.twist.linear.x,
+                            acceleration.accel.accel.linear.x,
+                            steer,
+                        )
+                        
     def onOdometry(self, msg):
         self._present_kinematic_state = msg
 
