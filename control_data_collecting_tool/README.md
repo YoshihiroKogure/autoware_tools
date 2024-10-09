@@ -78,41 +78,39 @@ This package provides tools for automatically collecting data using pure pursuit
 
 10. If you want to restart data collecting automatic driving, run the following command
 
-   ```bash
-   ros2 topic pub /data_collecting_stop_request std_msgs/msg/Bool "data: false" --once
-   ```
-
+    ```bash
+    ros2 topic pub /data_collecting_stop_request std_msgs/msg/Bool "data: false" --once
+    ```
 
 ## Change Courses
 
 - You can change the course by selecting `COURSE_NAME` in `config/param.yaml` from [`eight_course`, `u_shaped_return`, `straight_line_positive`, `straight_line_negative`].
 
-   - `COURSE_NAME: eight_course`
-   <img src="resource/figure_eight.png" width="480">
+  - `COURSE_NAME: eight_course`
+    <img src="resource/figure_eight.png" width="480">
 
-   - `COURSE_NAME: u_shaped_return`
-   <img src="resource/u_shaped.png" width="480">
+  - `COURSE_NAME: u_shaped_return`
+    <img src="resource/u_shaped.png" width="480">
 
-   - `COURSE_NAME: straight_line_positive` or `COURSE_NAME: straight_line_negative`
-   ( Both "straight_line_positive" and "straight_line_negative" represent straight line courses, but the direction of travel of the course is reversed.)
-   <img src="resource/straight_line.png" width="480">
+  - `COURSE_NAME: straight_line_positive` or `COURSE_NAME: straight_line_negative`
+    ( Both "straight_line_positive" and "straight_line_negative" represent straight line courses, but the direction of travel of the course is reversed.)
+    <img src="resource/straight_line.png" width="480">
 
 - The `eight_course` allows for efficient collection of speed, acceleration, and steering angle data within a limited area.
-   <img src="resource/data_collection_eight_figure.png" width="480">
+  <img src="resource/data_collection_eight_figure.png" width="480">
 
-- If sufficient space is not available and you cannot collect high-speed data, please use `u_shaped_return`,  `straight_line_positive` or `straight_line_negative`.
-   <img src="resource/data_collection_u_shaped.png" width="480">
+- If sufficient space is not available and you cannot collect high-speed data, please use `u_shaped_return`, `straight_line_positive` or `straight_line_negative`.
+  <img src="resource/data_collection_u_shaped.png" width="480">
 
-
-##  Regarding the Termination of Data Collection
+## Regarding the Termination of Data Collection
 
 There are two parameters used by the user to determine the termination of data collection.
 
-- `NUM_OF_VEL_ACC_THRESHOLD` 
+- `NUM_OF_VEL_ACC_THRESHOLD`
 
 When the number of data in all cells of the velocity and acceleration heatmap exceeds this value, data collection will be notified by displaying the following message in the terminal.
 
-```
+```bash
 sufficient acceleration - velocity data has been collected.
 ```
 
@@ -120,12 +118,11 @@ sufficient acceleration - velocity data has been collected.
 
 When the number of data for each class of the average of the absolute values of the recent 16 steer rates exceeds this value, data collection will be notified by displaying the following message in the terminal.
 
-```
+```bash
 sufficient steer_rate data has been collected.
 ```
 
 The minimum value, maximum value, and the number of classes are determined by the following parameters, `MEAN_ABS_STEER_RATE_MIN`, `MEAN_ABS_STEER_RATE_MAX`, `NUM_OF_BINS_MEAN_ABS_STEER_RATE`.
-
 
 ## Parameter
 

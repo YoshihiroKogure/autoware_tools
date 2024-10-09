@@ -612,7 +612,7 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
             plt.xlabel("future timestamp [s]")
             plt.ylabel("steer [rad]")
             plt.legend()
-            plt.pause(0.01)
+            plt.pause(0.1)
 
 
 def main(args=None):

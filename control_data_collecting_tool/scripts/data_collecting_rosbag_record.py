@@ -1,19 +1,35 @@
 #!/usr/bin/env python3
+
+# Copyright 2024 Proxima Technology Inc, TIER IV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from datetime import datetime
+from functools import partial
+
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile
-from rosbag2_py import SequentialWriter, StorageOptions, ConverterOptions
+from rclpy.serialization import serialize_message
+from rosbag2_py import ConverterOptions
+from rosbag2_py import SequentialWriter
+from rosbag2_py import StorageOptions
 from rosbag2_py._storage import TopicMetadata
 from rosidl_runtime_py.utilities import get_message
-from rclpy.serialization import serialize_message
-import os
-from datetime import datetime
-import time
-from functools import partial
+
 
 class DataCollectingRosbagRecord(Node):
     def __init__(self, topics):
-        super().__init__('data_collecting_rosbag_record')
+        super().__init__("data_collecting_rosbag_record")
         self.topics = topics
         self.writer = SequentialWriter()
         self.subscribed = False
@@ -41,18 +57,22 @@ class DataCollectingRosbagRecord(Node):
 
         now = datetime.now()
         formatted_time = now.strftime("%Y_%m_%d-%H_%M_%S")
-        bag_dir = f'./rosbag2_{formatted_time}'
-        storage_options = StorageOptions(uri=bag_dir, storage_id='sqlite3')
-        converter_options = ConverterOptions(input_serialization_format='cdr', output_serialization_format='cdr')
+        bag_dir = f"./rosbag2_{formatted_time}"
+        storage_options = StorageOptions(uri=bag_dir, storage_id="sqlite3")
+        converter_options = ConverterOptions(
+            input_serialization_format="cdr", output_serialization_format="cdr"
+        )
         try:
             self.writer.open(storage_options, converter_options)
         except Exception as e:
             self.get_logger().error(f"Failed to open bag: {e}")
             return
-        
+
         for topic_name, topic_type in zip(self.topics, topic_type_list):
             self.get_logger().info(f"Recording topic: {topic_name} of type: {topic_type}")
-            topic_metadata = TopicMetadata(name=topic_name, type=topic_type, serialization_format='cdr')
+            topic_metadata = TopicMetadata(
+                name=topic_name, type=topic_type, serialization_format="cdr"
+            )
             self.writer.create_topic(topic_metadata)
         self.subscribed = True
 
@@ -85,6 +105,7 @@ class DataCollectingRosbagRecord(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to write message: {e}")
 
+
 def main(args=None):
     rclpy.init(args=args)
     topics = ["/localization/kinematic_state", "/localization/acceleration"]
@@ -95,5 +116,6 @@ def main(args=None):
 
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

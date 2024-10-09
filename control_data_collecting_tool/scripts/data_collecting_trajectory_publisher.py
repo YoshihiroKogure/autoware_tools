@@ -16,27 +16,21 @@
 
 from autoware_planning_msgs.msg import Trajectory
 from autoware_planning_msgs.msg import TrajectoryPoint
-from geometry_msgs.msg import AccelWithCovarianceStamped
+from data_collecting_base_node import DataCollectingBaseNode
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import PolygonStamped
 import matplotlib.pyplot as plt
-from nav_msgs.msg import Odometry
 import numpy as np
-from numpy import arctan2
 from numpy import cos
 from numpy import pi
 from numpy import sin
 from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
-from rclpy.node import Node
 from scipy.spatial.transform import Rotation as R
-import seaborn as sns
 from std_msgs.msg import Bool
+from std_msgs.msg import Int32MultiArray
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
-
-import rosbag_play
-import os
 
 debug_matplotlib_plot_flag = False
 Differential_Smoothing_Flag = True
@@ -312,7 +306,7 @@ def get_u_shaped_return_course_trajectory_points(
         return np.array([x, y]).T, yaw, curve[:i_end], parts, achievement_rates
 
 
-class DataCollectingTrajectoryPublisher(Node):
+class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
     def __init__(self):
         super().__init__("data_collecting_trajectory_publisher")
 
@@ -322,120 +316,6 @@ class DataCollectingTrajectoryPublisher(Node):
             ParameterDescriptor(
                 description="Course name [eight_course, u_shaped_return, straight_line_positive, straight_line_negative]"
             ),
-        )
-
-        self.declare_parameter(
-            "NUM_BINS_V",
-            10,
-            ParameterDescriptor(description="Number of bins of velocity in heatmap"),
-        )
-
-        self.declare_parameter(
-            "NUM_BINS_STEER",
-            10,
-            ParameterDescriptor(description="Number of bins of steer in heatmap"),
-        )
-
-        self.declare_parameter(
-            "NUM_BINS_A",
-            10,
-            ParameterDescriptor(description="Number of bins of acceleration in heatmap"),
-        )
-
-        self.declare_parameter(
-            "NUM_OF_BINS_MEAN_ABS_STEER_RATE",
-            6,
-            ParameterDescriptor(description="Number of bins of the average of the absolute values of the recent 16 steering rates"),
-        )
-
-        self.declare_parameter(
-            "V_MIN",
-            -1.0,
-            ParameterDescriptor(description="Maximum velocity in heatmap [m/s]"),
-        )
-
-        self.declare_parameter(
-            "V_MAX",
-            1.0,
-            ParameterDescriptor(description="Minimum steer in heatmap [m/s]"),
-        )
-
-        self.declare_parameter(
-            "STEER_MIN",
-            -1.0,
-            ParameterDescriptor(description="Maximum steer in heatmap [rad]"),
-        )
-
-        self.declare_parameter(
-            "STEER_MAX",
-            1.0,
-            ParameterDescriptor(description="Maximum steer in heatmap [rad]"),
-        )
-
-        self.declare_parameter(
-            "A_MIN",
-            -1.0,
-            ParameterDescriptor(description="Minimum acceleration in heatmap [m/ss]"),
-        )
-
-        self.declare_parameter(
-            "A_MAX",
-            1.0,
-            ParameterDescriptor(description="Maximum acceleration in heatmap [m/ss]"),
-        )
-
-        self.declare_parameter(
-            "MEAN_ABS_STEER_RATE_MIN",
-            0.0,
-            ParameterDescriptor(description="Minimum of the average of the absolute values of the recent 16 steering rates [rad/s]"),
-        )
-
-        self.declare_parameter(
-            "MEAN_ABS_STEER_RATE_MAX",
-            0.3,
-            ParameterDescriptor(description="Maximum of the average of the absolute values of the recent 16 steering rates [rad/s]"),
-        )
-
-        self.declare_parameter(
-            "NUM_OF_VEL_ACC_THRESHOLD",
-            40,
-            ParameterDescriptor(description="Threshold of velocity - acceleration data collection"),
-        )
-
-        self.declare_parameter(
-            "NUM_OF_MEAN_ABS_STEER_RATE_THRESHOLD",
-            600,
-            ParameterDescriptor(description="Threshold of `mean_abs_steer_rate` data collection"),
-        )
-
-        self.declare_parameter(
-            "COLLECTING_DATA_V_MIN",
-            0.0,
-            ParameterDescriptor(description="Minimum velocity for data collection [m/s]"),
-        )
-
-        self.declare_parameter(
-            "COLLECTING_DATA_V_MAX",
-            11.5,
-            ParameterDescriptor(description="Maximum velocity for data collection [m/s]"),
-        )
-
-        self.declare_parameter(
-            "COLLECTING_DATA_A_MIN",
-            -1.0,
-            ParameterDescriptor(description="Minimum velocity for data collection [m/ss]"),
-        )
-
-        self.declare_parameter(
-            "COLLECTING_DATA_A_MAX",
-            1.0,
-            ParameterDescriptor(description="Maximum velocity for data collection [m/ss]"),
-        )
-
-        self.declare_parameter(
-            "wheel_base",
-            2.79,  # sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml
-            ParameterDescriptor(description="Wheel base [m]"),
         )
 
         self.declare_parameter(
@@ -510,6 +390,30 @@ class DataCollectingTrajectoryPublisher(Node):
             ),
         )
 
+        self.declare_parameter(
+            "COLLECTING_DATA_V_MIN",
+            0.0,
+            ParameterDescriptor(description="Minimum velocity for data collection [m/s]"),
+        )
+
+        self.declare_parameter(
+            "COLLECTING_DATA_V_MAX",
+            11.5,
+            ParameterDescriptor(description="Maximum velocity for data collection [m/s]"),
+        )
+
+        self.declare_parameter(
+            "COLLECTING_DATA_A_MIN",
+            -1.0,
+            ParameterDescriptor(description="Minimum velocity for data collection [m/ss]"),
+        )
+
+        self.declare_parameter(
+            "COLLECTING_DATA_A_MAX",
+            1.0,
+            ParameterDescriptor(description="Maximum velocity for data collection [m/ss]"),
+        )
+
         self.trajectory_for_collecting_data_pub_ = self.create_publisher(
             Trajectory,
             "/data_collecting_trajectory",
@@ -528,20 +432,6 @@ class DataCollectingTrajectoryPublisher(Node):
             1,
         )
 
-        self.sub_odometry_ = self.create_subscription(
-            Odometry,
-            "/localization/kinematic_state",
-            self.onOdometry,
-            1,
-        )
-
-        self.sub_acceleration_ = self.create_subscription(
-            AccelWithCovarianceStamped,
-            "/localization/acceleration",
-            self.onAcceleration,
-            1,
-        )
-
         self.sub_data_collecting_area_ = self.create_subscription(
             PolygonStamped,
             "/data_collecting_area",
@@ -552,76 +442,6 @@ class DataCollectingTrajectoryPublisher(Node):
 
         # set course name
         self.COURSE_NAME = self.get_parameter("COURSE_NAME").value
-
-        # velocity and acceleration grid
-        # velocity and steer grid
-        self.num_bins_v = self.get_parameter("NUM_BINS_V").get_parameter_value().integer_value
-        self.num_bins_steer = (
-            self.get_parameter("NUM_BINS_STEER").get_parameter_value().integer_value
-        )
-        self.num_bins_a = self.get_parameter("NUM_BINS_A").get_parameter_value().integer_value
-        self.num_of_bins_mean_abs_steer_rate = self.get_parameter("NUM_OF_BINS_MEAN_ABS_STEER_RATE").get_parameter_value().integer_value
-        self.v_min, self.v_max = (
-            self.get_parameter("V_MIN").get_parameter_value().double_value,
-            self.get_parameter("V_MAX").get_parameter_value().double_value,
-        )
-        self.steer_min, self.steer_max = (
-            self.get_parameter("STEER_MIN").get_parameter_value().double_value,
-            self.get_parameter("STEER_MAX").get_parameter_value().double_value,
-        )
-        self.a_min, self.a_max = (
-            self.get_parameter("A_MIN").get_parameter_value().double_value,
-            self.get_parameter("A_MAX").get_parameter_value().double_value,
-        )
-        self.mean_abs_steer_rate_min, self.mean_abs_steer_rate_max = (
-            self.get_parameter("MEAN_ABS_STEER_RATE_MIN").get_parameter_value().double_value,
-            self.get_parameter("MEAN_ABS_STEER_RATE_MAX").get_parameter_value().double_value,
-        )
-
-        self.num_of_vel_acc_threshold = self.get_parameter("NUM_OF_VEL_ACC_THRESHOLD").get_parameter_value().integer_value
-        self.num_of_mean_abs_steer_rate_threshold = self.get_parameter("NUM_OF_MEAN_ABS_STEER_RATE_THRESHOLD").get_parameter_value().integer_value
-
-        self.v_bins = np.linspace(self.v_min, self.v_max, self.num_bins_v + 1)
-        self.steer_bins = np.linspace(self.steer_min, self.steer_max, self.num_bins_steer + 1)
-        self.steer_rate_bins = np.linspace(
-            self.mean_abs_steer_rate_min,
-            self.mean_abs_steer_rate_max,
-            self.num_of_bins_mean_abs_steer_rate + 1,
-        )
-        self.a_bins = np.linspace(self.a_min, self.a_max, self.num_bins_a + 1)
-        
-
-        self.v_bin_centers = (self.v_bins[:-1] + self.v_bins[1:]) / 2
-        self.steer_bin_centers = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
-        self.steer_rate_bin_centers = (self.steer_rate_bins[:-1] + self.steer_rate_bins[1:]) / 2
-        self.a_bin_centers = (self.a_bins[:-1] + self.a_bins[1:]) / 2
-
-        collecting_data_min_v, collecting_data_max_v = (
-            self.get_parameter("COLLECTING_DATA_V_MIN").get_parameter_value().double_value,
-            self.get_parameter("COLLECTING_DATA_V_MAX").get_parameter_value().double_value,
-        )
-
-        collecting_data_min_a, collecting_data_max_a = (
-            self.get_parameter("COLLECTING_DATA_A_MIN").get_parameter_value().double_value,
-            self.get_parameter("COLLECTING_DATA_A_MAX").get_parameter_value().double_value,
-        )
-
-        self.collectig_data_min_n_v = max([np.digitize(collecting_data_min_v, self.v_bins) - 1, 0])
-        self.collectig_data_max_n_v = min([np.digitize(collecting_data_max_v, self.v_bins) - 1, self.num_bins_v - 1]) + 1
-
-        self.collectig_data_min_n_a = max([np.digitize(collecting_data_min_a, self.v_bins) - 1, 0])
-        self.collectig_data_max_n_a = min([np.digitize(collecting_data_max_a, self.v_bins) - 1, self.num_bins_a - 1]) + 1
-
-        self.collected_data_counts_of_vel_acc = np.zeros((self.num_bins_v, self.num_bins_a))
-        self.collected_data_counts_of_vel_steer = np.zeros((self.num_bins_v, self.num_bins_steer))
-        self.collected_data_counts_of_steer_rate = np.zeros(self.num_of_bins_mean_abs_steer_rate)
-
-        self.num_steer_rate_hist = 16
-        self.previous_steer = 0.0
-        self.steer_rate_hist = []
-
-        self.previous_acc = 0.0
-        self.data_collecting_jerk_threshold = 0.5
 
         self.trajectory_parts = None
         self.trajectory_achievement_rates = None
@@ -636,9 +456,6 @@ class DataCollectingTrajectoryPublisher(Node):
 
         self.on_line_vel_flag = True
         self.deceleration_rate = 0.6
-
-        self.vel_hist = np.zeros(200)
-        self.acc_hist = np.zeros(200)
 
         self.timer_period_callback = 0.03  # 30ms
         self.traj_step = 0.1
@@ -663,61 +480,53 @@ class DataCollectingTrajectoryPublisher(Node):
         )
 
         self.one_round_progress_rate = None
-
         self.vel_noise_list = []
 
-        self.previous_yaw = 0.0
+        collecting_data_min_v, collecting_data_max_v = (
+            self.get_parameter("COLLECTING_DATA_V_MIN").get_parameter_value().double_value,
+            self.get_parameter("COLLECTING_DATA_V_MAX").get_parameter_value().double_value,
+        )
 
-        rosbag2_dir_list = [d for d in os.listdir("./") if os.path.isdir(os.path.join("./", d))]
-        self.load_rosbag_data(rosbag2_dir_list)
+        collecting_data_min_a, collecting_data_max_a = (
+            self.get_parameter("COLLECTING_DATA_A_MIN").get_parameter_value().double_value,
+            self.get_parameter("COLLECTING_DATA_A_MAX").get_parameter_value().double_value,
+        )
 
+        self.collectig_data_min_n_v = max([np.digitize(collecting_data_min_v, self.v_bins) - 1, 0])
+        self.collectig_data_max_n_v = (
+            min([np.digitize(collecting_data_max_v, self.v_bins) - 1, self.num_bins_v - 1]) + 1
+        )
 
-    def load_rosbag_data(self, rosbag2_dir_list):
+        self.collectig_data_min_n_a = max([np.digitize(collecting_data_min_a, self.v_bins) - 1, 0])
+        self.collectig_data_max_n_a = (
+            min([np.digitize(collecting_data_max_a, self.v_bins) - 1, self.num_bins_a - 1]) + 1
+        )
 
-        for rosbag2_dir in rosbag2_dir_list:
-            rosbag2_file = "./" + rosbag2_dir + "/" + rosbag2_dir + "_0.db3"
-            db3converter = rosbag_play.db3Converter(rosbag2_file)
-            
-            load_acc_topic = db3converter.load_db3('/localization/acceleration')
-            load_kinematic_topic = db3converter.load_db3('/localization/kinematic_state')
+        self.collected_data_counts_of_vel_acc_subscriber_ = self.create_subscription(
+            Int32MultiArray,
+            "/control_data_collecting_tools/collected_data_counts_of_vel_acc",
+            self.subscribe_collected_data_counts_of_vel_acc,
+            10,
+        )
+        self.collected_data_counts_of_vel_acc_subscriber_
 
-            if load_acc_topic and load_kinematic_topic:
-                previous_steer = 0.0
-                steer_rate_hist = []
-                while True:
-                    acceleration = db3converter.read_msg('/localization/acceleration')
-                    kinematic_state = db3converter.read_msg('/localization/kinematic_state')
-                    if load_acc_topic and load_kinematic_topic:
-                        break
-                    angular_z = kinematic_state.twist.twist.angular.z
-                    wheel_base = self.get_parameter("wheel_base").get_parameter_value().double_value
-                    steer = arctan2(
-                        wheel_base * angular_z, kinematic_state.twist.twist.linear.x
-                    )
+        self.collected_data_counts_of_vel_steer_subscriber_ = self.create_subscription(
+            Int32MultiArray,
+            "/control_data_collecting_tools/collected_data_counts_of_vel_steer",
+            self.subscribe_collected_data_counts_of_vel_steer,
+            10,
+        )
+        self.collected_data_counts_of_vel_steer_subscriber_
 
-                    steer_rate = (steer - previous_steer) / self.timer_period_callback
-                    steer_rate_hist.append(steer_rate)
-                    if len(steer_rate_hist) > self.num_steer_rate_hist:
-                        steer_rate_abs_mean = np.mean(abs(np.array(steer_rate_hist)))
-                        steer_rate_hist.pop(0)
-                    else:
-                        steer_rate_abs_mean = None
+    def subscribe_collected_data_counts_of_vel_acc(self, msg):
+        rows = msg.layout.dim[0].size
+        cols = msg.layout.dim[1].size
+        self.collected_data_counts_of_vel_acc = np.array(msg.data).reshape((rows, cols))
 
-                        # update velocity and acceleration bin if ego vehicle is moving
-                    if kinematic_state.twist.twist.linear.x > 1e-3:
-                        self.count_observations(
-                            kinematic_state.twist.twist.linear.x,
-                            acceleration.accel.accel.linear.x,
-                            steer,
-                            steer_rate_abs_mean,
-                        )
-
-
-    def onOdometry(self, msg):
-        self._present_kinematic_state = msg
-
-    def onAcceleration(self, msg):
-        self._present_acceleration = msg
+    def subscribe_collected_data_counts_of_vel_steer(self, msg):
+        rows = msg.layout.dim[0].size
+        cols = msg.layout.dim[1].size
+        self.collected_data_counts_of_vel_steer = np.array(msg.data).reshape((rows, cols))
 
     def onDataCollectingArea(self, msg):
         self._data_collecting_area_polygon = msg
@@ -729,16 +538,10 @@ class DataCollectingTrajectoryPublisher(Node):
         ]  # "left_circle", "right_circle", "linear_positive", "linear_negative"
         achievement_rate = self.trajectory_achievement_rates[nearestIndex]
         current_vel = self._present_kinematic_state.twist.twist.linear.x
-        current_acc = self._present_acceleration.accel.accel.linear.x
 
         acc_kp_of_pure_pursuit = self.get_parameter("acc_kp").get_parameter_value().double_value
         N_V = self.num_bins_v
         N_A = self.num_bins_a
-
-        self.acc_hist[:-1] = 1.0 * self.acc_hist[1:]
-        self.acc_hist[-1] = current_acc
-        self.vel_hist[:-1] = 1.0 * self.vel_hist[1:]
-        self.vel_hist[-1] = current_vel
 
         max_lateral_accel = (
             self.get_parameter("max_lateral_accel").get_parameter_value().double_value
@@ -1132,105 +935,12 @@ class DataCollectingTrajectoryPublisher(Node):
         else:
             return True
 
-    def count_observations(self, v, a, steer, steer_rate_abs_mean):
-        v_bin = np.digitize(v, self.v_bins) - 1
-        steer_bin = np.digitize(steer, self.steer_bins) - 1
-        a_bin = np.digitize(a, self.a_bins) - 1
-
-        if 0 <= v_bin < self.num_bins_v and 0 <= a_bin < self.num_bins_a:
-            jerk = (a - self.previous_acc) / self.timer_period_callback
-            if abs(jerk) < self.data_collecting_jerk_threshold:
-                self.collected_data_counts_of_vel_acc[v_bin, a_bin] += 1
-
-        if 0 <= v_bin < self.num_bins_v and 0 <= steer_bin < self.num_bins_steer:
-            self.collected_data_counts_of_vel_steer[v_bin, steer_bin] += 1
-
-        if steer_rate_abs_mean is not None:
-            steer_rate_abs_mean_bin = np.digitize(steer_rate_abs_mean, self.steer_rate_bins) - 1
-            if 0 <= steer_rate_abs_mean_bin < self.num_of_bins_mean_abs_steer_rate:
-                self.collected_data_counts_of_steer_rate[steer_rate_abs_mean_bin] += 1
-
-    def plot_data_collection_grid(self):
-        self.axs[1].cla()
-        self.axs[1].scatter(self.acc_hist, self.vel_hist)
-        self.axs[1].plot(self.acc_hist, self.vel_hist)
-        self.axs[1].set_xlim([-2.0, 2.0])
-        self.axs[1].set_ylim([0.0, self.v_max + 1.0])
-        self.axs[1].set_xlabel("Acceleration")
-        self.axs[1].set_ylabel("Velocity")
-
-        # update collected acceleration and velocity grid
-        for collection in self.axs[2].collections:
-            if collection.colorbar is not None:
-                collection.colorbar.remove()
-        self.axs[2].cla()
-
-        self.heatmap = sns.heatmap(
-            self.collected_data_counts_of_vel_acc.T,
-            annot=True,
-            cmap="coolwarm",
-            xticklabels=np.round(self.v_bin_centers, 2),
-            yticklabels=np.round(self.a_bin_centers, 2),
-            ax=self.axs[2],
-            linewidths=0.1,
-            linecolor="gray",
-        )
-
-        self.axs[2].set_xlabel("Velocity bins")
-        self.axs[2].set_ylabel("Acceleration bins")
-
-        for collection in self.axs[3].collections:
-            if collection.colorbar is not None:
-                collection.colorbar.remove()
-        self.axs[3].cla()
-
-        self.heatmap = sns.heatmap(
-            self.collected_data_counts_of_vel_steer.T,
-            annot=True,
-            cmap="coolwarm",
-            xticklabels=np.round(self.v_bin_centers, 2),
-            yticklabels=np.round(self.steer_bin_centers, 2),
-            ax=self.axs[3],
-            linewidths=0.1,
-            linecolor="gray",
-        )
-
-        self.axs[3].set_xlabel("Velocity bins")
-        self.axs[3].set_ylabel("Steer bins")
-
     def timer_callback_traj(self):
         if (
             self._present_kinematic_state is not None
             and self._present_acceleration is not None
             and self.trajectory_position_data is not None
         ):
-            # calculate steer
-            angular_z = self._present_kinematic_state.twist.twist.angular.z
-            wheel_base = self.get_parameter("wheel_base").get_parameter_value().double_value
-            steer = arctan2(
-                wheel_base * angular_z, self._present_kinematic_state.twist.twist.linear.x
-            )
-
-            steer_rate = (steer - self.previous_steer) / self.timer_period_callback
-            self.steer_rate_hist.append(steer_rate)
-            if len(self.steer_rate_hist) > self.num_steer_rate_hist:
-                steer_rate_abs_mean = np.mean(abs(np.array(self.steer_rate_hist)))
-                self.steer_rate_hist.pop(0)
-            else:
-                steer_rate_abs_mean = None
-
-            # update velocity and acceleration bin if ego vehicle is moving
-            if self._present_kinematic_state.twist.twist.linear.x > 1e-3:
-                self.count_observations(
-                    self._present_kinematic_state.twist.twist.linear.x,
-                    self._present_acceleration.accel.accel.linear.x,
-                    steer,
-                    steer_rate_abs_mean,
-                )
-
-            self.previous_steer = steer
-            self.previous_acc = self._present_acceleration.accel.accel.linear.x
-
             # [0] update nominal target trajectory if changing related ros2 params
             target_longitudinal_velocity = (
                 self.get_parameter("target_longitudinal_velocity")
@@ -1580,24 +1290,6 @@ class DataCollectingTrajectoryPublisher(Node):
                 msg.data = True
                 self.pub_stop_request_.publish(msg)
 
-            # [6-4] info finish data collection
-            if (
-                np.min(self.collected_data_counts_of_steer_rate)
-                >= self.num_of_mean_abs_steer_rate_threshold
-            ):
-                self.get_logger().info(
-                    "sufficient steer_rate data has been collected."
-                )
-
-            if (
-                np.min(self.collected_data_counts_of_vel_acc)
-                >= self.num_of_vel_acc_threshold
-            ):
-                self.get_logger().info(
-                    "sufficient acceleration - velocity data has been collected."
-                )
-            
-
             if debug_matplotlib_plot_flag:
                 self.axs[0].cla()
                 step_size_array = np.sqrt(
@@ -1652,8 +1344,6 @@ class DataCollectingTrajectoryPublisher(Node):
                 self.axs[0].set_xlabel("future timestamp [s]")
                 self.axs[0].set_ylabel("longitudinal_velocity [m/s]")
                 self.axs[0].legend(fontsize=8)
-
-                self.plot_data_collection_grid()
 
                 self.fig.canvas.draw()
                 plt.pause(0.01)
