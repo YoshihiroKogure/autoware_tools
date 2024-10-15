@@ -120,6 +120,7 @@ class DataCollectingBaseNode(Node):
         self.num_bins_steer = (
             self.get_parameter("NUM_BINS_STEER").get_parameter_value().integer_value
         )
+        self.num_bins_steer_rate = 7
         self.num_bins_a = self.get_parameter("NUM_BINS_A").get_parameter_value().integer_value
         self.v_min, self.v_max = (
             self.get_parameter("V_MIN").get_parameter_value().double_value,
@@ -129,6 +130,7 @@ class DataCollectingBaseNode(Node):
             self.get_parameter("STEER_MIN").get_parameter_value().double_value,
             self.get_parameter("STEER_MAX").get_parameter_value().double_value,
         )
+        self.steer_rate_min, self.steer_rate_max = 0.0, 0.30
         self.a_min, self.a_max = (
             self.get_parameter("A_MIN").get_parameter_value().double_value,
             self.get_parameter("A_MAX").get_parameter_value().double_value,
@@ -140,13 +142,18 @@ class DataCollectingBaseNode(Node):
         self.collected_data_counts_of_vel_steer = np.zeros(
             (self.num_bins_v, self.num_bins_steer), dtype=np.int32
         )
+        self.collected_data_counts_of_vel_steer_rate = np.zeros(
+            (self.num_bins_v, self.num_bins_steer_rate), dtype=np.int32
+        )
 
         self.v_bins = np.linspace(self.v_min, self.v_max, self.num_bins_v + 1)
         self.steer_bins = np.linspace(self.steer_min, self.steer_max, self.num_bins_steer + 1)
+        self.steer_rate_bins = np.linspace(self.steer_rate_min, self.steer_rate_max, self.num_bins_steer_rate + 1)
         self.a_bins = np.linspace(self.a_min, self.a_max, self.num_bins_a + 1)
 
         self.v_bin_centers = (self.v_bins[:-1] + self.v_bins[1:]) / 2
         self.steer_bin_centers = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
+        self.steer_rate_bin_centers = (self.steer_rate_bins[:-1] + self.steer_rate_bins[1:]) / 2
         self.a_bin_centers = (self.a_bins[:-1] + self.a_bins[1:]) / 2
 
     def onOdometry(self, msg):

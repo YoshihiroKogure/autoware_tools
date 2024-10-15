@@ -32,6 +32,8 @@ from std_msgs.msg import Int32MultiArray
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 
+import random
+
 debug_matplotlib_plot_flag = False
 Differential_Smoothing_Flag = True
 USE_CURVATURE_RADIUS_FLAG = False
@@ -60,6 +62,7 @@ def get_eight_course_trajectory_points(
     long_side_length: float,
     short_side_length: float,
     step: float,
+    amplitude: float
 ):
     a = short_side_length
     b = long_side_length
@@ -92,16 +95,30 @@ def get_eight_course_trajectory_points(
     parts = ["part" for _ in range(len(t_array.copy()))]
     i_end = t_array.shape[0]
 
+    amp = -amplitude
+    hz = 2.0
+
+    def kappa_sin(A, C, x):
+        A = abs(A)
+        C = abs(C)
+        return A * C * C * abs(sin(C * x)) / (1 + A * A * C * C * cos(C * x) * cos(C * x)) ** 1.5
+
     for i, t in enumerate(t_array):
         if t > OB + BD + AD + AC + CO:
             i_end = i
             break
 
         if 0 <= t and t <= OB:
-            x[i] = (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t / OB
-            y[i] = a * t / (2 * OB)
-            yaw[i] = θB
-            curve[i] = 1e-10
+            xy = np.array([0.0, -amp * np.sin(2 * hz * np.pi * t / OB - np.pi)])
+            theta = np.arctan2(
+                -amp * 2 * hz * np.pi / OB * np.cos(2 * hz * np.pi * t / OB - np.pi), 1.0
+            )
+            rot = np.array([[np.cos(θB), -np.sin(θB)], [np.sin(θB), np.cos(θB)]])
+            xy = rot @ xy
+            x[i] = (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t / OB + xy[0]
+            y[i] = a * t / (2 * OB) + xy[1]
+            yaw[i] = θB + theta
+            curve[i] = 1e-10 + kappa_sin(amp, 2 * hz * np.pi / OB, t)
             parts[i] = "linear_positive"
             achievement_rates[i] = t / (2 * OB) + 0.5
 
@@ -117,10 +134,21 @@ def get_eight_course_trajectory_points(
 
         if OB + BD <= t and t <= OB + BD + AD:
             t2 = t - (OB + BD)
-            x[i] = D[0] - (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t2 / OB
-            y[i] = D[1] + a * t2 / (2 * OB)
-            yaw[i] = np.pi - θB
-            curve[i] = 1e-10
+
+            xy = np.array([0.0, -amp * np.sin(2 * hz * np.pi * t2 / OB)])
+            theta = np.arctan2(-amp * 2 * hz * np.pi / OB * np.cos(2 * hz * np.pi * t2 / OB), 1.0)
+            rot = np.array(
+                [
+                    [np.cos(np.pi - θB), -np.sin(np.pi - θB)],
+                    [np.sin(np.pi - θB), np.cos(np.pi - θB)],
+                ]
+            )
+            xy = rot @ xy
+            x[i] = D[0] - (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t2 / OB + xy[0]
+            y[i] = D[1] + a * t2 / (2 * OB) + xy[1]
+            yaw[i] = np.pi - θB + theta
+            curve[i] = 1e-10 + kappa_sin(amp, 2 * hz * np.pi / OB, t2)
+
             parts[i] = "linear_negative"
             achievement_rates[i] = t2 / (2 * OB)
 
@@ -136,10 +164,17 @@ def get_eight_course_trajectory_points(
 
         if OB + BD + AD + AC <= t and t <= OB + BD + AD + AC + CO:
             t4 = t - (OB + BD + AD + AC)
-            x[i] = C[0] + (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t4 / OB
-            y[i] = C[1] + a * t4 / (2 * OB)
-            yaw[i] = θB
-            curve[i] = 1e-10
+
+            xy = np.array([0.0, amp * np.sin(2 * hz * np.pi * t4 / CO)])
+            theta = np.arctan2(amp * 2 * hz * np.pi / CO * np.cos(2 * hz * np.pi * t4), 1.0)
+            rot = np.array([[np.cos(θB), -np.sin(θB)], [np.sin(θB), np.cos(θB)]])
+            xy = rot @ xy
+
+            x[i] = C[0] + (b / 2 - (1.0 - np.sqrt(3) / 2) * a) * t4 / OB + xy[0]
+            y[i] = C[1] + a * t4 / (2 * OB) + xy[1]
+            yaw[i] = θB + theta
+            curve[i] = 1e-10 + kappa_sin(amp, 2 * hz * np.pi / OB, t4)
+
             parts[i] = "linear_positive"
             achievement_rates[i] = t4 / (2 * OB)
 
@@ -277,6 +312,17 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
     def __init__(self):
         super().__init__("data_collecting_trajectory_publisher")
 
+        # mask to specify velocity and accelearation
+        self.vel_acc_mask = np.zeros((10,10), dtype=np.int32)
+        for i in range(10):
+            for j in range(10):
+                self.vel_acc_mask[i,j] = 1
+
+        self.declare_parameter(
+            "DATA_COLLECTION_MODE",
+            "vel_acc_data_collection",
+        )
+
         self.declare_parameter(
             "COURSE_NAME",
             "eight_course",
@@ -407,6 +453,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         )
         self.sub_data_collecting_area_
 
+        # data collection mode
+        self.mode = self.get_parameter("DATA_COLLECTION_MODE").value
+
         # set course name
         self.COURSE_NAME = self.get_parameter("COURSE_NAME").value
 
@@ -427,6 +476,10 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         self.timer_period_callback = 0.03  # 30ms
         self.traj_step = 0.1
         self.timer_traj = self.create_timer(self.timer_period_callback, self.timer_callback_traj)
+
+        self.amplitude = 0.0
+        self.update_traj = False
+        self.count = 0
 
         if debug_matplotlib_plot_flag:
             self.fig, self.axs = plt.subplots(4, 1, figsize=(12, 20))
@@ -498,13 +551,27 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
     def onDataCollectingArea(self, msg):
         self._data_collecting_area_polygon = msg
         self.updateNominalTargetTrajectory()
-
+    
     def get_target_velocity(self, nearestIndex):
         part = self.trajectory_parts[
             nearestIndex
         ]  # "left_circle", "right_circle", "linear_positive", "linear_negative"
         achievement_rate = self.trajectory_achievement_rates[nearestIndex]
         current_vel = self._present_kinematic_state.twist.twist.linear.x
+
+        if part == "left_circle" and 0.5 < achievement_rate < 0.6 and not self.update_traj and self.mode == "steer_rate_data_collection":
+            self.amplitude= [0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1.0, 2.0][self.count % 12]
+            self.count += 1
+            self.updateNominalTargetTrajectory()
+            part = self.trajectory_parts[
+                    nearestIndex
+                ]  # "left_circle", "right_circle", "linear_positive", "linear_negative"
+            achievement_rate = self.trajectory_achievement_rates[nearestIndex]
+            current_vel = self._present_kinematic_state.twist.twist.linear.x
+            self.update_traj = True
+        
+        if part == "right_circle":
+            self.update_traj = False
 
         acc_kp_of_pure_pursuit = self.get_parameter("acc_kp").get_parameter_value().double_value
         N_V = self.num_bins_v
@@ -550,8 +617,11 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             ]
 
             for i in range(self.collectig_data_min_n_v, self.collectig_data_max_n_v):
+            #for i in range(0,N_V):
                 for j in range(self.collectig_data_min_n_a, self.collectig_data_max_n_a):
-                    if (i, j) not in exclude_idx_list:
+                #for j in range(0,N_A):
+                    #if (i, j) not in exclude_idx_list:
+                    if self.vel_acc_mask[i,j] == 1 and  (i, j) not in exclude_idx_list:
                         if (
                             min_num_data - min_data_num_margin
                             > self.collected_data_counts_of_vel_acc[i, j]
@@ -618,9 +688,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 achievement_rate < self.deceleration_rate
                 or self.target_vel_on_line < self.v_max / 2.0
             ):
-                if self.collected_data_counts_of_vel_acc[self.vel_idx, self.acc_idx] > 50:
-                    self.acc_idx = np.argmin(self.collected_data_counts_of_vel_acc[self.vel_idx, :])
-                    self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
+                # if self.collected_data_counts_of_vel_acc[self.vel_idx, self.acc_idx] > 50:
+                    # self.acc_idx = np.argmin(self.collected_data_counts_of_vel_acc[self.vel_idx, :])
+                    # self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
 
                 if (
                     current_vel
@@ -628,22 +698,35 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                         [self.target_vel_on_line - 1.5 * self.v_max / N_V, self.v_max / N_V / 2.0]
                     )
                     and self.target_acc_on_line < 0.0
-                ):
-                    self.acc_idx = np.argmin(
-                        self.collected_data_counts_of_vel_acc[self.vel_idx, int(N_A / 2.0) : N_A]
-                    ) + int(N_A / 2)
-                    self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
+                ):  
+                    # acceleration
+                    in_mask_idx = np.where(self.vel_acc_mask[self.vel_idx, int(N_A / 2.0) : N_A] == 1)
+                    if len(in_mask_idx) == 0:
+                        self.target_acc_on_line = 1.0
+                    else:
+                        self.acc_idx = np.argmin(
+                            self.collected_data_counts_of_vel_acc[self.vel_idx, in_mask_idx]
+                        ) + int(N_A / 2)
+                        self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
 
                 elif (
                     current_vel > self.target_vel_on_line + 1.5 * self.v_max / N_V
                     and self.target_acc_on_line > 0.0
                 ):
-                    self.acc_idx = np.argmin(
-                        self.collected_data_counts_of_vel_acc[self.vel_idx, 0 : int(N_A / 2.0)]
-                    )
-                    self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
+                    # deceleration
+                    in_mask_idx = np.where(self.vel_acc_mask[self.vel_idx, 0 : int(N_A / 2.0)] == 1)
+                    if len(in_mask_idx) == 0:
+                        self.target_acc_on_line = -1.0
+                    else:
+                        self.acc_idx = np.argmin(
+                            self.collected_data_counts_of_vel_acc[self.vel_idx, in_mask_idx]
+                        )
+                        self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
 
                 target_vel = current_vel + self.target_acc_on_line / acc_kp_of_pure_pursuit
+
+            if achievement_rate < self.deceleration_rate and self.mode == "steer_rate_data_collection" and self.COURSE_NAME == "eight_course":
+                target_vel = np.min([7.25, max_vel_from_lateral_acc])
 
             # deceleration
             if self.deceleration_rate <= achievement_rate:
@@ -667,6 +750,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         self.prev_part = part
 
         return target_vel
+
 
     def updateNominalTargetTrajectory(self):
         data_collecting_area = np.array(
@@ -741,7 +825,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 self.trajectory_parts,
                 self.trajectory_achievement_rates,
             ) = get_eight_course_trajectory_points(
-                actual_long_side, actual_short_side, self.traj_step
+                actual_long_side, actual_short_side, self.traj_step, self.amplitude
             )
 
         elif (
@@ -920,7 +1004,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             if (
                 np.abs(target_longitudinal_velocity - self.current_target_longitudinal_velocity)
                 > 1e-6
-                or window != self.current_window
+                or window != self.current_window 
             ):
                 self.updateNominalTargetTrajectory()
 
@@ -1024,6 +1108,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
             # set target velocity
             target_vel = self.get_target_velocity(nearestIndex)
+            #target_vel = 8.0
 
             trajectory_longitudinal_velocity_data = np.array(
                 [target_vel for _ in range(len(trajectory_longitudinal_velocity_data))]

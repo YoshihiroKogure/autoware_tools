@@ -61,6 +61,7 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
 
         self.vel_hist = deque([float(0.0)] * 200, maxlen=200)
         self.acc_hist = deque([float(0.0)] * 200, maxlen=200)
+        self.steer_rate_hist = deque([float(0.0)] * 200, maxlen=200)
 
         self.timer_period_callback = 0.033  # 30ms
         self.timer_counter = self.create_timer(
@@ -73,6 +74,10 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
         )
         self.collected_data_counts_of_vel_steer_publisher_ = self.create_publisher(
             Int32MultiArray, "/control_data_collecting_tools/collected_data_counts_of_vel_steer", 10
+        )
+
+        self.collected_data_counts_of_vel_steer_rate_publisher_ = self.create_publisher(
+            Int32MultiArray, "/control_data_collecting_tools/collected_data_counts_of_vel_steer_rate", 10
         )
 
         self.vel_hist_publisher_ = self.create_publisher(
@@ -90,6 +95,8 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
             ),
         )
 
+        self.previous_steer = 0.0
+        
         load_rosbag2_files = (
             self.get_parameter("LOAD_ROSBAG2_FILES").get_parameter_value().bool_value
         )
@@ -205,8 +212,11 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
                     current_time += self.timer_period_callback
 
     def count_observations(self, v, a, steer):
+        steer_rate = (steer - self.previous_steer) / 0.033
+        steer_rate_abs_mean = np.mean(np.abs(list(self.steer_rate_hist)[0:16]))
         v_bin = np.digitize(v, self.v_bins) - 1
         steer_bin = np.digitize(steer, self.steer_bins) - 1
+        steer_rate_bin = np.digitize(steer_rate_abs_mean, self.steer_rate_bins) - 1
         a_bin = np.digitize(a, self.a_bins) - 1
 
         if 0 <= v_bin < self.num_bins_v and 0 <= a_bin < self.num_bins_a:
@@ -214,6 +224,15 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
 
         if 0 <= v_bin < self.num_bins_v and 0 <= steer_bin < self.num_bins_steer:
             self.collected_data_counts_of_vel_steer[v_bin, steer_bin] += 1
+
+        if 0 <= v_bin < self.num_bins_v and 0 <= steer_bin < self.num_bins_steer:
+            self.collected_data_counts_of_vel_steer[v_bin, steer_bin] += 1
+
+        if 0 <= v_bin < self.num_bins_v and 0 <= steer_rate_bin < self.num_bins_steer_rate:
+            self.collected_data_counts_of_vel_steer_rate[v_bin, steer_rate_bin] += 1
+
+        self.current_steer_rate = steer_rate
+        self.previous_steer = steer
 
     # call back for counting data points
     def timer_callback_counter(self):
@@ -237,6 +256,7 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
 
                 self.acc_hist.append(float(current_acc))
                 self.vel_hist.append(float(current_vel))
+                self.steer_rate_hist.append(float(self.current_steer_rate))
 
         # publish collected_data_counts_of_vel_acc
         publish_Int32MultiArray(
@@ -247,6 +267,11 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
         publish_Int32MultiArray(
             self.collected_data_counts_of_vel_steer_publisher_,
             self.collected_data_counts_of_vel_steer,
+        )
+
+        publish_Int32MultiArray(
+            self.collected_data_counts_of_vel_steer_rate_publisher_,
+            self.collected_data_counts_of_vel_steer_rate,
         )
 
         # publish acc_hist

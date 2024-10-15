@@ -2,6 +2,9 @@
   ros__parameters:
     LOAD_ROSBAG2_FILES: true
 
+    DATA_COLLECTION_MODE: vel_acc_data_collection
+    # DATA_COLLECTION_MODE: steer_rate_data_collection
+    
     COURSE_NAME: eight_course
     # COURSE_NAME: u_shaped_return
     # COURSE_NAME: straight_line_positive
@@ -23,7 +26,7 @@
     COLLECTING_DATA_A_MAX: 1.0
 
     max_lateral_accel: 0.5
-    lateral_error_threshold: 2.0
+    lateral_error_threshold: 3.0
     yaw_error_threshold: 0.50
     velocity_limit_by_tracking_error: 1.0
     mov_ave_window: 100
@@ -36,7 +39,7 @@
     # pure_pursuit_type: naive
     wheel_base: 2.79
     acc_kp: 1.0
-    lookahead_time: 2.0
+    lookahead_time: 1.0
     min_lookahead: 2.0
     linearized_pure_pursuit_steer_kp_param: 2.0
     linearized_pure_pursuit_steer_kd_param: 2.0
