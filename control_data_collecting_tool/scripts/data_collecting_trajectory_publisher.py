@@ -560,7 +560,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         current_vel = self._present_kinematic_state.twist.twist.linear.x
 
         if part == "left_circle" and 0.5 < achievement_rate < 0.6 and not self.update_traj and self.mode == "steer_rate_data_collection":
-            self.amplitude= [0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1.0, 2.0][self.count % 12]
+            self.current_window= [100 + 100 * i for i in range(4)][self.count % 4]
             self.count += 1
             self.updateNominalTargetTrajectory()
             part = self.trajectory_parts[
@@ -594,6 +594,8 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         # set self.target_acc_on_line and self.target_vel_on_line after vehicle from circle part to linear part
         min_data_num_margin = 5
         min_index_list = []
+        delta_v = self.v_bins[1] - self.v_bins[0]
+        delta_a = self.a_bins[1] - self.a_bins[0]
         if (
             (self.prev_part == "left_circle" or self.prev_part == "right_circle")
             and (part == "linear_positive" or part == "linear_negative")
@@ -637,8 +639,8 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                             min_index_list.append((j, i))
 
             self.acc_idx, self.vel_idx = min_index_list[np.random.randint(0, len(min_index_list))]
-            self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
-            self.target_vel_on_line = self.v_bin_centers[self.vel_idx]
+            self.target_acc_on_line = self.a_bin_centers[self.acc_idx] + delta_a * (np.random.rand() - 0.5)
+            self.target_vel_on_line = self.v_bin_centers[self.vel_idx] + delta_v * (np.random.rand() - 0.5)
 
             if (
                 self.COURSE_NAME == "u_shaped_return"
@@ -688,9 +690,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 achievement_rate < self.deceleration_rate
                 or self.target_vel_on_line < self.v_max / 2.0
             ):
-                # if self.collected_data_counts_of_vel_acc[self.vel_idx, self.acc_idx] > 50:
-                    # self.acc_idx = np.argmin(self.collected_data_counts_of_vel_acc[self.vel_idx, :])
-                    # self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
+                if self.collected_data_counts_of_vel_acc[self.vel_idx, self.acc_idx] > 50:
+                    self.acc_idx = np.argmin(self.collected_data_counts_of_vel_acc[self.vel_idx, :])
+                    self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
 
                 if (
                     current_vel
@@ -707,7 +709,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                         self.acc_idx = np.argmin(
                             self.collected_data_counts_of_vel_acc[self.vel_idx, in_mask_idx]
                         ) + int(N_A / 2)
-                        self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
+                        self.target_acc_on_line = self.a_bin_centers[self.acc_idx] + delta_a * (np.random.rand() - 0.5)
 
                 elif (
                     current_vel > self.target_vel_on_line + 1.5 * self.v_max / N_V
@@ -721,17 +723,20 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                         self.acc_idx = np.argmin(
                             self.collected_data_counts_of_vel_acc[self.vel_idx, in_mask_idx]
                         )
-                        self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
+                        self.target_acc_on_line = self.a_bin_centers[self.acc_idx] + delta_a * (np.random.rand() - 0.5)
 
                 target_vel = current_vel + self.target_acc_on_line / acc_kp_of_pure_pursuit
 
-            if achievement_rate < self.deceleration_rate and self.mode == "steer_rate_data_collection" and self.COURSE_NAME == "eight_course":
-                target_vel = np.min([7.25, max_vel_from_lateral_acc])
+            #if achievement_rate < self.deceleration_rate and self.mode == "steer_rate_data_collection" and self.COURSE_NAME == "eight_course":
+                #target_vel = np.min([7.25, max_vel_from_lateral_acc])
 
             # deceleration
             if self.deceleration_rate <= achievement_rate:
                 if self.COURSE_NAME == "eight_course" or self.COURSE_NAME == "u_shaped_return":
-                    target_vel = np.min([self.v_max / 10.0, max_vel_from_lateral_acc / 2.0])
+                    if self.target_vel_on_line > self.v_max / 2.0:
+                        target_vel = self.v_max / 10.0 #np.min([self.v_max / 10.0, max_vel_from_lateral_acc / 2.0])
+                    else:
+                        target_vel = self.v_max / 7.5
                 elif (
                     self.COURSE_NAME == "straight_line_positive"
                     or self.COURSE_NAME == "straight_line_negative"
@@ -740,12 +745,13 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
         # set target velocity on circle part
         if part == "left_circle" or part == "right_circle":
+            sin_curve = np.sin(2 * pi * achievement_rate)
             if achievement_rate < 0.10 and self.target_vel_on_line > self.v_max / 2.0:
-                target_vel = np.min([self.v_max / 10.0, max_vel_from_lateral_acc / 2.0])
+                target_vel = max_vel_from_lateral_acc#np.min([self.v_max / 10.0, max_vel_from_lateral_acc / 2.0])
             elif achievement_rate < 0.50:
-                target_vel = max_vel_from_lateral_acc / 2.0
+                target_vel = max_vel_from_lateral_acc#/ 2.0
             else:
-                target_vel = max_vel_from_lateral_acc
+                target_vel = max_vel_from_lateral_acc 
 
         self.prev_part = part
 
