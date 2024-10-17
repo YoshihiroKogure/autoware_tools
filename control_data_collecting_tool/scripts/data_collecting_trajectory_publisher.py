@@ -749,11 +749,11 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         if part == "left_circle" or part == "right_circle":
             sin_curve = np.sin(2 * pi * achievement_rate)
             if achievement_rate < 0.10 and self.target_vel_on_line > self.v_max / 2.0:
-                target_vel = max_vel_from_lateral_acc#np.min([self.v_max / 10.0, max_vel_from_lateral_acc / 2.0])
-            elif achievement_rate < 0.50:
+                target_vel = max_vel_from_lateral_acc #np.min([self.v_max / 10.0, max_vel_from_lateral_acc / 2.0])
+            elif achievement_rate < 0.75:
                 target_vel = max_vel_from_lateral_acc#/ 2.0
             else:
-                target_vel = max_vel_from_lateral_acc 
+                target_vel = max_vel_from_lateral_acc / 5.0 
 
         self.prev_part = part
 
