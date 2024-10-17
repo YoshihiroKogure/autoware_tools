@@ -559,8 +559,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         achievement_rate = self.trajectory_achievement_rates[nearestIndex]
         current_vel = self._present_kinematic_state.twist.twist.linear.x
 
+        '''
         if part == "left_circle" and 0.5 < achievement_rate < 0.6 and not self.update_traj and self.mode == "steer_rate_data_collection":
-            self.current_window= [100 + 100 * i for i in range(4)][self.count % 4]
+            self.current_window= #[100 + 100 * i for i in range(4)][self.count % 4]
             self.count += 1
             self.updateNominalTargetTrajectory()
             part = self.trajectory_parts[
@@ -572,6 +573,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         
         if part == "right_circle":
             self.update_traj = False
+        '''
 
         acc_kp_of_pure_pursuit = self.get_parameter("acc_kp").get_parameter_value().double_value
         N_V = self.num_bins_v
