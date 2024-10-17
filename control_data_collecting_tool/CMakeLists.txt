@@ -11,6 +11,7 @@ install(PROGRAMS
   scripts/data_collecting_rosbag_record.py
   scripts/data_collecting_data_counter.py
   scripts/data_collecting_base_node.py
+  scripts/data_collecting_mask_selector.py
   scripts/rosbag_play.py
   DESTINATION lib/${PROJECT_NAME}
 )
