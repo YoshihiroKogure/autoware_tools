@@ -12,6 +12,7 @@ install(PROGRAMS
   scripts/data_collecting_data_counter.py
   scripts/data_collecting_base_node.py
   scripts/rosbag_play.py
+  scripts/calc_trajectory.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

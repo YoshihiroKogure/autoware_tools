@@ -31,6 +31,8 @@ from std_msgs.msg import Bool
 from std_msgs.msg import Int32MultiArray
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+from calc_trajectory import calc_trajectory
+import random
 
 debug_matplotlib_plot_flag = False
 Differential_Smoothing_Flag = True
@@ -406,6 +408,13 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             self.onDataCollectingArea,
             1,
         )
+
+        self.TRAJECTORY = calc_trajectory(30)
+        while len(self.TRAJECTORY.trajectory_length_list) < 3:
+                    self.TRAJECTORY.add_steer_trajectory(random.randint(0,len(self.TRAJECTORY.steer_list)-1))
+
+        self.nearestIndex = 0
+
         self.sub_data_collecting_area_
 
         # set course name
@@ -869,6 +878,81 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
         self.get_logger().info("update nominal target trajectory")
 
+    def get_offset_data(self):
+        data_collecting_area = np.array(
+            [
+                np.array(
+                    [
+                        self._data_collecting_area_polygon.polygon.points[i].x,
+                        self._data_collecting_area_polygon.polygon.points[i].y,
+                        self._data_collecting_area_polygon.polygon.points[i].z,
+                    ]
+                )
+                for i in range(4)
+            ]
+        )
+
+        # [1] compute an approximate rectangle
+        l1 = np.sqrt(((data_collecting_area[0, :2] - data_collecting_area[1, :2]) ** 2).sum())
+        l2 = np.sqrt(((data_collecting_area[1, :2] - data_collecting_area[2, :2]) ** 2).sum())
+        l3 = np.sqrt(((data_collecting_area[2, :2] - data_collecting_area[3, :2]) ** 2).sum())
+        l4 = np.sqrt(((data_collecting_area[3, :2] - data_collecting_area[0, :2]) ** 2).sum())
+        la = (l1 + l3) / 2
+        lb = (l2 + l4) / 2
+        if np.abs(la - lb) < 1e-6:
+            la += 0.1  # long_side_length must not be equal to short_side_length7
+
+        rectangle_center_position = np.zeros(2)
+        for i in range(4):
+            rectangle_center_position[0] += data_collecting_area[i, 0] / 4.0
+            rectangle_center_position[1] += data_collecting_area[i, 1] / 4.0
+
+        vec_from_center_to_point0_data = data_collecting_area[0, :2] - rectangle_center_position
+        vec_from_center_to_point1_data = data_collecting_area[1, :2] - rectangle_center_position
+        unit_vec_from_center_to_point0_data = vec_from_center_to_point0_data / (
+            np.sqrt((vec_from_center_to_point0_data**2).sum()) + 1e-10
+        )
+        unit_vec_from_center_to_point1_data = vec_from_center_to_point1_data / (
+            np.sqrt((vec_from_center_to_point1_data**2).sum()) + 1e-10
+        )
+
+        # [2] compute whole trajectory
+        # [2-1] generate figure eight path
+        if la > lb:
+            long_side_length = la
+            short_side_length = lb
+            vec_long_side = (
+                -unit_vec_from_center_to_point0_data + unit_vec_from_center_to_point1_data
+            )
+        else:
+            long_side_length = lb
+            short_side_length = la
+            vec_long_side = (
+                unit_vec_from_center_to_point0_data + unit_vec_from_center_to_point1_data
+            )
+        unit_vec_long_side = vec_long_side / np.sqrt((vec_long_side**2).sum())
+        if unit_vec_long_side[1] < 0:
+            unit_vec_long_side *= -1
+        yaw_offset = np.arccos(unit_vec_long_side[0])
+        if yaw_offset > pi / 2:
+            yaw_offset -= pi
+
+        long_side_margin = 5
+        long_side_margin = 5
+
+        actual_long_side = max(long_side_length - long_side_margin, 1.1)
+        actual_short_side = max(short_side_length - long_side_margin, 1.0)
+
+        # [2-2] translation and rotation of origin
+        rot_matrix = np.array(
+            [
+                [np.cos(yaw_offset), -np.sin(yaw_offset)],
+                [np.sin(yaw_offset), np.cos(yaw_offset)],
+            ]
+        )
+
+        return rot_matrix, rectangle_center_position, yaw_offset
+    
     def checkInDateCollectingArea(self, current_pos):
         data_collecting_area = np.array(
             [
@@ -954,14 +1038,24 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             else:
                 present_yaw = getYaw(present_orientation)
                 self.previous_yaw = present_yaw
-
-            # [2] get whole trajectory data
+            # [2] get trajectory data
+            rot_matrix, rectangle_center_position, yaw_offset = self.get_offset_data()
+            trajectory_position_data = np.concatenate([(rot_matrix@self.TRAJECTORY.trajectory_list[i]["trajectory"].T).T + rectangle_center_position for i in range(3)],axis=0)
+            trajectory_yaw_data = np.concatenate([self.TRAJECTORY.trajectory_list[i]["yaw"] + yaw_offset for i in range(3)],axis=0)
+            trajectory_longitudinal_velocity_data = np.zeros(
+                len(trajectory_yaw_data)
+            )
+            trajectory_curvature_data =  np.concatenate([self.TRAJECTORY.trajectory_list[i]["curve"] for i in range(3)],axis=0)
+            trajectory_achivement_data = np.concatenate([self.TRAJECTORY.trajectory_list[i]["achievement_rates"] for i in range(3)],axis=0)
+            '''
             trajectory_position_data = self.trajectory_position_data.copy()
             trajectory_yaw_data = self.trajectory_yaw_data.copy()
             trajectory_longitudinal_velocity_data = (
                 self.trajectory_longitudinal_velocity_data.copy()
             )
             trajectory_curvature_data = self.trajectory_curvature_data.copy()
+            '''
+            
 
             # [3] prepare velocity noise
             while True:
@@ -998,13 +1092,14 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             self.vel_noise_list.pop(0)
 
             # [4] find near point index for local trajectory
-            distance = np.sqrt(((trajectory_position_data - present_position[:2]) ** 2).sum(axis=1))
+            
+            distance = np.sqrt(((trajectory_position_data[0:self.TRAJECTORY.trajectory_length_list[0]+self.TRAJECTORY.trajectory_length_list[1]] - present_position[:2]) ** 2).sum(axis=1))
             index_array_near = np.argsort(distance)
-
-            nearestIndex = None
-            if (self.one_round_progress_rate is None) or (present_linear_velocity[0] < 0.1):
+            #self.get_logger().info(str(trajectory_position_data.shape))
+            #nearestIndex = None
+            if (self.one_round_progress_rate is None): #or (present_linear_velocity[0] < -0.1):
                 # if initializing, or if re-initialize while stopping
-                nearestIndex = index_array_near[0]
+                self.nearestIndex = index_array_near[0]
             else:
                 for i in range(len(index_array_near)):
                     progress_rate_diff = (
@@ -1016,16 +1111,28 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                         progress_rate_diff += 1.0
                     near_progress_rate_threshold = 0.2
                     if np.abs(progress_rate_diff) < near_progress_rate_threshold:
-                        nearestIndex = 1 * index_array_near[i]
+                        self.nearestIndex = 1 * index_array_near[i]
                         break
-                if nearestIndex is None:
-                    nearestIndex = index_array_near[0]
+                if self.nearestIndex is None:
+                    self.nearestIndex = index_array_near[0]
+            self.nearestIndex = index_array_near[0] #+ 1
 
-            self.one_round_progress_rate = 1.0 * nearestIndex / len(trajectory_position_data)
+            #self.get_logger().info(str(trajectory_curvature_data[self.nearestIndex]))
+            self.one_round_progress_rate = 1.0 * self.nearestIndex / len(trajectory_position_data)
 
             # set target velocity
-            target_vel = self.get_target_velocity(nearestIndex)
-
+            rate = trajectory_achivement_data[self.nearestIndex]
+            # low
+            target_vel = 1.75 + 1.5 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
+            #middle low
+            #target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            #middle high
+            # target_vel = 6.5 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            #high
+            #if self.TRAJECTORY.trajectory_list[0]["type"] == "non_boundary":
+                #target_vel = 7.0 + 4.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            #elif self.TRAJECTORY.trajectory_list[0]["type"] == "boundary":
+                #target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
             trajectory_longitudinal_velocity_data = np.array(
                 [target_vel for _ in range(len(trajectory_longitudinal_velocity_data))]
             )
@@ -1045,8 +1152,8 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     trajectory_longitudinal_velocity_data[:aug_data_length],
                 ]
             )
-            trajectory_longitudinal_velocity_data[nearestIndex:] += np.array(self.vel_noise_list)[
-                : len(trajectory_longitudinal_velocity_data[nearestIndex:])
+            trajectory_longitudinal_velocity_data[self.nearestIndex:] += np.array(self.vel_noise_list)[
+                : len(trajectory_longitudinal_velocity_data[self.nearestIndex:])
             ]
             trajectory_longitudinal_velocity_data_without_limit = (
                 trajectory_longitudinal_velocity_data.copy()
@@ -1092,11 +1199,18 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             )
 
             tmp_lateral_error = np.sqrt(
-                ((trajectory_position_data[nearestIndex] - present_position[:2]) ** 2).sum()
+                ((trajectory_position_data[self.nearestIndex] - present_position[:2]) ** 2).sum()
             )
 
-            tmp_yaw_error = np.abs(present_yaw - trajectory_yaw_data[nearestIndex])
+            nearest_yaw = trajectory_yaw_data[self.nearestIndex]
+            while nearest_yaw > np.pi:
+                nearest_yaw -= 2 * np.pi
+            while nearest_yaw < -np.pi:
+                nearest_yaw += 2 * np.pi
 
+            tmp_yaw_error = np.abs(present_yaw - nearest_yaw)
+            self.get_logger().info(str(tmp_yaw_error))
+            
             if lateral_error_threshold < tmp_lateral_error or yaw_error_threshold < tmp_yaw_error:
                 if Differential_Smoothing_Flag:
                     velocity_limit_by_tracking_error_array = (
@@ -1112,28 +1226,28 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     trajectory_longitudinal_velocity_data = np.minimum(
                         trajectory_longitudinal_velocity_data, velocity_limit_by_tracking_error
                     )
-
+            
             # [6] publish
             # [6-1] publish trajectory
             pub_traj_len = min(int(50 / self.traj_step), aug_data_length)
             tmp_traj = Trajectory()
             for i in range(pub_traj_len):
                 tmp_traj_point = TrajectoryPoint()
-                tmp_traj_point.pose.position.x = trajectory_position_data[i + nearestIndex, 0]
-                tmp_traj_point.pose.position.y = trajectory_position_data[i + nearestIndex, 1]
+                tmp_traj_point.pose.position.x = trajectory_position_data[i + self.nearestIndex, 0]
+                tmp_traj_point.pose.position.y = trajectory_position_data[i + self.nearestIndex, 1]
                 tmp_traj_point.pose.position.z = present_position[2]
 
                 tmp_traj_point.pose.orientation.x = 0.0
                 tmp_traj_point.pose.orientation.y = 0.0
                 tmp_traj_point.pose.orientation.z = np.sin(
-                    trajectory_yaw_data[i + nearestIndex] / 2
+                    trajectory_yaw_data[i + self.nearestIndex] / 2
                 )
                 tmp_traj_point.pose.orientation.w = np.cos(
-                    trajectory_yaw_data[i + nearestIndex] / 2
+                    trajectory_yaw_data[i + self.nearestIndex] / 2
                 )
 
                 tmp_traj_point.longitudinal_velocity_mps = trajectory_longitudinal_velocity_data[
-                    i + nearestIndex
+                    i + self.nearestIndex
                 ]
                 tmp_traj.points.append(tmp_traj_point)
 
@@ -1225,8 +1339,8 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
             tangent_vec = np.array(
                 [
-                    tmp_traj.points[1].pose.position.x - tmp_traj.points[0].pose.position.x,
-                    tmp_traj.points[1].pose.position.y - tmp_traj.points[0].pose.position.y,
+                    np.cos(trajectory_yaw_data[self.nearestIndex]),#tmp_traj.points[1].pose.position.x - tmp_traj.points[0].pose.position.x,
+                    np.sin(trajectory_yaw_data[self.nearestIndex])#tmp_traj.points[1].pose.position.y - tmp_traj.points[0].pose.position.y,
                 ]
             )
 
@@ -1268,41 +1382,41 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 distance = np.zeros(len(trajectory_position_data))
                 for i in range(1, len(trajectory_position_data)):
                     distance[i] = distance[i - 1] + step_size_array[i - 1]
-                distance -= distance[nearestIndex]
+                distance -= distance[self.nearestIndex]
                 time_width_array = step_size_array / (
                     trajectory_longitudinal_velocity_data[:-1] + 0.01
                 )
                 timestamp = np.zeros(len(trajectory_position_data))
                 for i in range(1, len(trajectory_position_data)):
                     timestamp[i] = timestamp[i - 1] + time_width_array[i - 1]
-                timestamp -= timestamp[nearestIndex]
+                timestamp -= timestamp[self.nearestIndex]
 
                 self.axs[0].plot(0, present_linear_velocity[0], "o", label="current vel")
 
                 self.axs[0].plot(
-                    timestamp[nearestIndex : nearestIndex + pub_traj_len],
+                    timestamp[self.nearestIndex : self.nearestIndex + pub_traj_len],
                     trajectory_longitudinal_velocity_data_without_limit[
-                        nearestIndex : nearestIndex + pub_traj_len
+                        self.nearestIndex : self.nearestIndex + pub_traj_len
                     ],
                     "--",
                     label="target vel before applying limit",
                 )
                 self.axs[0].plot(
-                    timestamp[nearestIndex : nearestIndex + pub_traj_len],
-                    lateral_acc_limit[nearestIndex : nearestIndex + pub_traj_len],
+                    timestamp[self.nearestIndex : self.nearestIndex + pub_traj_len],
+                    lateral_acc_limit[self.nearestIndex : self.nearestIndex + pub_traj_len],
                     "--",
                     label="lateral acc limit (always)",
                 )
                 self.axs[0].plot(
-                    timestamp[nearestIndex : nearestIndex + pub_traj_len],
+                    timestamp[self.nearestIndex : self.nearestIndex + pub_traj_len],
                     velocity_limit_by_tracking_error * np.ones(pub_traj_len),
                     "--",
                     label="vel limit by tracking error (only when exceeding threshold)",
                 )
                 self.axs[0].plot(
-                    timestamp[nearestIndex : nearestIndex + pub_traj_len],
+                    timestamp[self.nearestIndex : self.nearestIndex + pub_traj_len],
                     trajectory_longitudinal_velocity_data[
-                        nearestIndex : nearestIndex + pub_traj_len
+                        self.nearestIndex : self.nearestIndex + pub_traj_len
                     ],
                     label="actual target vel",
                 )
@@ -1316,6 +1430,10 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 self.fig.canvas.draw()
                 plt.pause(0.01)
 
+            if self.nearestIndex > self.TRAJECTORY.trajectory_length_list[0]:
+                self.TRAJECTORY.remove_trajectory()
+                while len(self.TRAJECTORY.trajectory_length_list) < 3:
+                    self.TRAJECTORY.add_steer_trajectory(random.randint(0,len(self.TRAJECTORY.steer_list)-1))
 
 def main(args=None):
     rclpy.init(args=args)

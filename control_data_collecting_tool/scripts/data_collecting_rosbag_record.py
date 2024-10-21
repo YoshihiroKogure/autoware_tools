@@ -100,7 +100,7 @@ class MessageWriter:
                     msg_module, topic_name, partial(self.callback_write_message, topic_name), 10
                 )
                 self.message_subscriptions_.append(subscription_)
-        self.nodeget_logger().info("start recording rosbag")
+        self.node.get_logger().info("start recording rosbag")
 
     # call back function called in start recording
     def callback_write_message(self, topic_name, message):
@@ -116,7 +116,7 @@ class MessageWriter:
         for subscription_ in self.message_subscriptions_:
             self.node.destroy_subscription(subscription_)
         del self.message_writer
-        self.get_logger().info("stop recording rosbag")
+        self.node.get_logger().info("stop recording rosbag")
 
 
 class DataCollectingRosbagRecord(Node):
