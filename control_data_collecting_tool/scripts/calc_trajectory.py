@@ -189,7 +189,7 @@ def calc_two_circles_one_line_trajectory(center_point1, r1, theta_1_start, theta
     parts = parts[:i_end]
     achievement_rates = achievement_rates[:i_end]
 
-    return np.array([x, y]).T, yaw, curve, parts, achievement_rates
+    return np.array([x, y]).T, yaw, curve, parts, achievement_rates, total_distance
 
 
 
@@ -295,7 +295,7 @@ def calc_two_circles_excircle_trajectory(center_point1, r1, theta_1_start, theta
     parts = parts[:i_end]
     achievement_rates = achievement_rates[:i_end]
 
-    return np.array([x, y]).T, yaw, curve, parts, achievement_rates
+    return np.array([x, y]).T, yaw, curve, parts, achievement_rates, total_distance
 
 
 def calc_two_circles_common_tangent_trajectory(R,r):
@@ -313,40 +313,40 @@ def calc_two_circles_common_tangent_trajectory(R,r):
                 theta_2_start = np.arctan2(contact_point2[1] - center_2[1], contact_point2[0] - center_2[0])
 
                 # 軌道を計算
-                traj, yaw, curve, parts, achievement_rates = calc_two_circles_one_line_trajectory(
+                traj, yaw, curve, parts, achievement_rates, total_distance = calc_two_circles_one_line_trajectory(
                     center_1, r, np.pi, theta_1_end, center_2, r, theta_2_start, 0.0, 0.05)
 
-                return "non_boundary", traj, yaw, curve, parts, achievement_rates, "clock_wise", "counter_clock_wise" 
+                return "non_boundary", traj, yaw, curve, parts, achievement_rates, "clock_wise", "counter_clock_wise", total_distance
 
             if contact_point1[1] > 0.0 and contact_point2[1] > 0.0 and R/2 <= r < R:  # ここで条件を調整
                 theta_1_end = np.arctan2(contact_point1[1] - center_1[1], contact_point1[0] - center_1[0])
                 theta_2_start = np.arctan2(contact_point2[1] - center_2[1], contact_point2[0] - center_2[0])
 
                 # 軌道を計算
-                traj, yaw, curve, parts, achievement_rates = calc_two_circles_one_line_trajectory(
+                traj, yaw, curve, parts, achievement_rates, total_distance = calc_two_circles_one_line_trajectory(
                     center_1, r, np.pi, theta_1_end, center_2, r, theta_2_start, 0.0, 0.05)
 
-                return "non_boundary", traj, yaw, curve, parts, achievement_rates, "clock_wise","clock_wise"
+                return "non_boundary", traj, yaw, curve, parts, achievement_rates, "clock_wise","clock_wise", total_distance
     elif R <= r:
-        center_1 = [-(R - R * 0.25), 0.0]
-        center_2 = [ (R - R * 0.25), 0.0]
-        theta, (x_center, y_center), (contact_1_x, contact_1_y), (contact_2_x, contact_2_y) = calc_excircle_tangent_to_two_circles(center_1[0], center_1[1], center_2[0], center_2[1], R * 0.25, r)
+        center_1 = [-(R - R * 0.5), 0.0]
+        center_2 = [ (R - R * 0.5), 0.0]
+        theta, (x_center, y_center), (contact_1_x, contact_1_y), (contact_2_x, contact_2_y) = calc_excircle_tangent_to_two_circles(center_1[0], center_1[1], center_2[0], center_2[1], R * 0.5, r)
         theta_1_end = np.arctan2(contact_1_y - center_1[1], contact_1_x - center_1[0])
         theta_2_start = np.arctan2(contact_2_y - center_2[1], contact_2_x - center_2[0])
-        traj, yaw, curve, parts, achievement_rates = calc_two_circles_excircle_trajectory(center_point1 = center_1, 
-                                                r1 = R * 0.25,
+        traj, yaw, curve, parts, achievement_rates, total_distance = calc_two_circles_excircle_trajectory(center_point1 = center_1, 
+                                                r1 = R * 0.5,
                                                 theta_1_start = np.pi,
                                                 theta_1_end = theta_1_end,
                                                 center_point2 = center_2, 
-                                                r2 = R * 0.25, 
+                                                r2 = R * 0.5, 
                                                 theta_2_start = theta_2_start, 
                                                 theta_2_end = 0.0,
                                                 excircle_center_point=[x_center, y_center], 
                                                 ext_r = r, 
                                                 theta_excircle_start = np.pi - (np.pi - theta) / 2, 
                                                 theta_excircle_end = (np.pi - theta) / 2, 
-                                                step = 0.05)
-        return "non_boundary", traj, yaw, curve, parts, achievement_rates, "clock_wise", "clock_wise"
+                                                step = 0.1)
+        return "non_boundary", traj, yaw, curve, parts, achievement_rates, "clock_wise", "clock_wise", total_distance
             
     return None
 
@@ -356,7 +356,7 @@ def calc_boundary_trajectory(R):
     circle = R * delta_theta
 
     total_distance = circle
-    t_array = np.arange(start=0.0, stop=total_distance, step=0.05).astype("float")
+    t_array = np.arange(start=0.0, stop=total_distance, step=0.1).astype("float")
 
     x = np.zeros(len(t_array))
     y = np.zeros(len(t_array))
@@ -395,7 +395,7 @@ def calc_boundary_trajectory(R):
     parts = parts[:i_end]
     achievement_rates = achievement_rates[:i_end]
 
-    return "boundary", np.array([x, y]).T, yaw, curve, parts, achievement_rates, "clock_wise", "clock_wise"
+    return "boundary", np.array([x, y]).T, yaw, curve, parts, achievement_rates, "clock_wise", "clock_wise", total_distance 
 
 
 
@@ -408,21 +408,22 @@ class calc_trajectory:
         L = 2.79
         self.steer_list =[-1.0,-0.90,-0.80,-0.70,-0.60, -0.50, -0.40] + [0.40, 0.50, 0.60,0.70,0.80,0.90,1.0]
         # middle low
-        #self.steer_list =[-0.60, -0.50, -0.40] + [ -0.3 + 0.1*i for i in range(3)] + [0.1*(1+i) for i in range(3)] + [0.40, 0.50, 0.60]
+        self.steer_list =[-0.60, -0.50, -0.40] + [ -0.3 + 0.1*i for i in range(3)] + [0.1*(1+i) for i in range(3)] + [0.40, 0.50, 0.60]
 
         #self.steer_list =  [ -0.3 + 0.03*i for i in range(10)] + [0.03*(1+i) for i in range(10)]
 
         # middle high
-        #self.steer_list =  [ -0.15 + 0.03*i for i in range(5)] + [0.03*(1+i) for i in range(5)]
+        self.steer_list =  [ -0.15 + 0.03*i for i in range(5)] + [0.03*(1+i) for i in range(5)]
 
         #high 
-        #self.steer_list =  [ -0.03 + 0.01* i for i in range(3)] + [0.01*(1+i) for i in range(3)]
+        # self.steer_list =  [ -0.03 + 0.01* i for i in range(3)] + [0.01*(1+i) for i in range(3)]
+
         self.steer_trajectory = {}
         for i in range(int(len(self.steer_list)/2),len(self.steer_list)):
             r = L / np.tan(self.steer_list[i])
-            boundary, traj, yaw, curve, parts, achievement_rates, in_direction, out_direction = calc_two_circles_common_tangent_trajectory(self.R, r)
+            boundary, traj, yaw, curve, parts, achievement_rates, in_direction, out_direction, total_distance = calc_two_circles_common_tangent_trajectory(self.R, r)
             
-            trajectory = {"type":boundary, "trajectory":traj, "yaw":yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":in_direction, "out_direction":out_direction}
+            trajectory = {"type":boundary, "trajectory":traj, "yaw":yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":in_direction, "out_direction":out_direction, "total_distance":total_distance}
             self.steer_trajectory[self.steer_list[i]] = trajectory
             
             in_direction_reversed = "clock_wise"
@@ -432,25 +433,25 @@ class calc_trajectory:
             if out_direction == "clock_wise":
                 out_direction_reversed = "counter_clock_wise"     
 
-            trajectory_reversed = {"type":boundary, "trajectory":traj@Rot,"yaw":-yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":in_direction_reversed, "out_direction":out_direction_reversed}
+            trajectory_reversed = {"type":boundary, "trajectory":traj@Rot,"yaw":-yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":in_direction_reversed, "out_direction":out_direction_reversed, "total_distance":total_distance}
             self.steer_trajectory[self.steer_list[len(self.steer_list)-1-i]] = trajectory_reversed
 
 
         self.inversion_trajectory = {}
         r = self.R / 2 * 0.95
-        boundary, traj, yaw, curve, parts, achievement_rates, _, _ = calc_two_circles_common_tangent_trajectory(self.R, r)
-        trajectory = {"type":boundary, "trajectory":traj,"yaw":yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":"clock_wise", "out_direction":"counter_clock_wise"}
+        boundary, traj, yaw, curve, parts, achievement_rates, _, _, total_distance = calc_two_circles_common_tangent_trajectory(self.R, r)
+        trajectory = {"type":boundary, "trajectory":traj,"yaw":yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":"clock_wise", "out_direction":"counter_clock_wise", "total_distance":total_distance}
         self.inversion_trajectory["clock_wise_to_counter_clock_wise"] = trajectory
 
-        trajectory_reversed = {"type":boundary, "trajectory":traj@Rot,"yaw":-yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":"counter_clock_wise", "out_direction":"clock_wise"}
+        trajectory_reversed = {"type":boundary, "trajectory":traj@Rot,"yaw":-yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":"counter_clock_wise", "out_direction":"clock_wise", "total_distance":total_distance}
         self.inversion_trajectory["counter_clock_wise_to_clock_wise"] = trajectory_reversed
 
 
         self.boundary_trajectory = {}
-        boundary, traj, yaw, curve, parts, achievement_rates, _, _ = calc_boundary_trajectory(self.R)
-        trajectory = {"type":boundary, "trajectory":traj, "yaw":yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":"clock_wise", "out_direction":"clock_wise"}
+        boundary, traj, yaw, curve, parts, achievement_rates, _, _, total_distance = calc_boundary_trajectory(self.R)
+        trajectory = {"type":boundary, "trajectory":traj, "yaw":yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction":"clock_wise", "out_direction":"clock_wise", "total_distance":total_distance}
         self.boundary_trajectory["clock_wise"] = trajectory
-        trajectory_reversed = {"type":boundary, "trajectory":traj@Rot,"yaw":-yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction": "counter_clock_wise","out_direction":"counter_clock_wise"}
+        trajectory_reversed = {"type":boundary, "trajectory":traj@Rot,"yaw":-yaw, "curve":curve, "parts":parts, "achievement_rates":achievement_rates, "in_direction": "counter_clock_wise","out_direction":"counter_clock_wise", "total_distance":total_distance}
         self.boundary_trajectory["counter_clock_wise"] = trajectory_reversed
 
         self.trajectory_list = [ self.boundary_trajectory["clock_wise"] ]
@@ -480,7 +481,7 @@ class calc_trajectory:
 
         modified_traj = (Rotation@trajectory["trajectory"].T).T
         modified_yaw = trajectory["yaw"] + delta_theta
-        modified_trajectory = {"type":trajectory["type"], "trajectory":modified_traj, "yaw":modified_yaw, "curve":trajectory["curve"], "parts":trajectory["parts"], "achievement_rates":trajectory["achievement_rates"], "in_direction":trajectory["in_direction"], "out_direction":trajectory["out_direction"]}
+        modified_trajectory = {"type":trajectory["type"], "trajectory":modified_traj, "yaw":modified_yaw, "curve":trajectory["curve"], "parts":trajectory["parts"], "achievement_rates":trajectory["achievement_rates"], "in_direction":trajectory["in_direction"], "out_direction":trajectory["out_direction"], "total_distance":trajectory["total_distance"]}
         self.latest_direction = trajectory["out_direction"]
 
         self.end_point = modified_traj[-1]

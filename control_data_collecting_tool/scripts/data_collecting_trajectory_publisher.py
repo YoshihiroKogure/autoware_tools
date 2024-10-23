@@ -409,7 +409,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             1,
         )
 
-        self.TRAJECTORY = calc_trajectory(30)
+        self.TRAJECTORY = calc_trajectory(40)
         while len(self.TRAJECTORY.trajectory_length_list) < 3:
                     self.TRAJECTORY.add_steer_trajectory(random.randint(0,len(self.TRAJECTORY.steer_list)-1))
 
@@ -1123,16 +1123,42 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             # set target velocity
             rate = trajectory_achivement_data[self.nearestIndex]
             # low
-            target_vel = 1.75 + 1.5 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
+            target_vel = 2.0 + 1.5 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
             #middle low
-            #target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
             #middle high
-            # target_vel = 6.5 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            target_vel = 6.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
             #high
             #if self.TRAJECTORY.trajectory_list[0]["type"] == "non_boundary":
-                #target_vel = 7.0 + 4.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            # target_vel = 9.0 + 2.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
             #elif self.TRAJECTORY.trajectory_list[0]["type"] == "boundary":
                 #target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
+
+            rate__ = trajectory_achivement_data[self.nearestIndex]
+            # low
+            target_vel = 2.0 + 1.5 * np.sin(2.0 * np.pi * rate__  - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate__  - np.pi) - np.pi)
+            #middle low
+            target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate__  - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate__  - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            #middle high
+            target_vel = 6.0 + 3.0 * np.sin(2.0 * np.pi * rate__  - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate__  - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            #high
+            #if self.TRAJECTORY.trajectory_list[0]["type"] == "non_boundary":
+            # target_vel = 9.0 + 2.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
+            #elif self.TRAJECTORY.trajectory_list[0]["type"] == "boundary":
+                #target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
+
+
+            cos_theta = cos(trajectory_yaw_data[self.nearestIndex + 20])
+            sin_theta = sin(trajectory_yaw_data[self.nearestIndex + 20])
+            eps = 0.3 / target_vel * np.sin(rate__ * self.TRAJECTORY.trajectory_list[0]["total_distance"])
+            eps_vec = rot_matrix@np.array([eps * sin_theta, eps * cos_theta])
+            eps_theta =  np.arctan2(0.3  * np.cos(rate__ * self.TRAJECTORY.trajectory_list[0]["total_distance"]), 1.0)
+
+            self.get_logger().info(str(eps_vec))
+
+            trajectory_position_data += rot_matrix@eps_vec
+            trajectory_yaw_data += eps_theta
+
             trajectory_longitudinal_velocity_data = np.array(
                 [target_vel for _ in range(len(trajectory_longitudinal_velocity_data))]
             )
