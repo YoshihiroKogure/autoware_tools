@@ -35,7 +35,7 @@ from calc_trajectory import calc_trajectory
 import random
 
 debug_matplotlib_plot_flag = False
-Differential_Smoothing_Flag = True
+Differential_Smoothing_Flag = False
 USE_CURVATURE_RADIUS_FLAG = False
 
 
@@ -410,8 +410,10 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         )
 
         self.TRAJECTORY = calc_trajectory(40)
-        while len(self.TRAJECTORY.trajectory_length_list) < 3:
-                    self.TRAJECTORY.add_steer_trajectory(random.randint(0,len(self.TRAJECTORY.steer_list)-1))
+        self.TRAJECTORY.add_inversion_trajectory(0.0)
+        self.TRAJECTORY.add_inversion_trajectory(0.0)
+
+        self.previous_updated_time = 0.0
 
         self.nearestIndex = 0
 
@@ -469,14 +471,14 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             self.get_parameter("COLLECTING_DATA_A_MAX").get_parameter_value().double_value,
         )
 
-        self.collectig_data_min_n_v = max([np.digitize(collecting_data_min_v, self.v_bins) - 1, 0])
-        self.collectig_data_max_n_v = (
+        self.collecting_data_min_n_v = max([np.digitize(collecting_data_min_v, self.v_bins) - 1, 0])
+        self.collecting_data_max_n_v = (
             min([np.digitize(collecting_data_max_v, self.v_bins) - 1, self.num_bins_v - 1]) + 1
         )
 
-        self.collectig_data_min_n_a = max([np.digitize(collecting_data_min_a, self.v_bins) - 1, 0])
-        self.collectig_data_max_n_a = (
-            min([np.digitize(collecting_data_max_a, self.v_bins) - 1, self.num_bins_a - 1]) + 1
+        self.collecting_data_min_n_a = max([np.digitize(collecting_data_min_a, self.v_bins) - 1, 0])
+        self.collecting_data_max_n_a = (
+            min([np.digitize(collecting_data_max_a, self.a_bins) - 1, self.num_bins_a - 1]) + 1
         )
 
         self.collected_data_counts_of_vel_acc_subscribption_ = self.create_subscription(
@@ -494,6 +496,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             10,
         )
         self.collected_data_counts_of_vel_steer_subscribption_
+
+        self.collection_mode = "steer"
+
 
     def subscribe_collected_data_counts_of_vel_acc(self, msg):
         rows = msg.layout.dim[0].size
@@ -535,7 +540,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         target_vel = min([self.v_max / N_V, max_vel_from_lateral_acc])
 
         # set self.target_acc_on_line and self.target_vel_on_line after vehicle from circle part to linear part
-        min_data_num_margin = 5
+        min_data_num_margin = 20
         min_index_list = []
         if (
             (self.prev_part == "left_circle" or self.prev_part == "right_circle")
@@ -1045,8 +1050,13 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             trajectory_longitudinal_velocity_data = np.zeros(
                 len(trajectory_yaw_data)
             )
+
+            max_curvature_on_segment = np.max(self.TRAJECTORY.trajectory_list[0]["curve"])
+            if self.TRAJECTORY.trajectory_list[0]["type"] == "boundary":
+                max_curvature_on_segment = np.max([max_curvature_on_segment, np.max(self.TRAJECTORY.trajectory_list[1]["curve"])])
+
             trajectory_curvature_data =  np.concatenate([self.TRAJECTORY.trajectory_list[i]["curve"] for i in range(3)],axis=0)
-            trajectory_achivement_data = np.concatenate([self.TRAJECTORY.trajectory_list[i]["achievement_rates"] for i in range(3)],axis=0)
+            trajectory_achievement_data = np.concatenate([self.TRAJECTORY.trajectory_list[i]["achievement_rates"] for i in range(3)],axis=0)
             '''
             trajectory_position_data = self.trajectory_position_data.copy()
             trajectory_yaw_data = self.trajectory_yaw_data.copy()
@@ -1121,43 +1131,76 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             self.one_round_progress_rate = 1.0 * self.nearestIndex / len(trajectory_position_data)
 
             # set target velocity
-            rate = trajectory_achivement_data[self.nearestIndex]
-            # low
-            target_vel = 2.0 + 1.5 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
-            #middle low
-            target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
-            #middle high
-            target_vel = 6.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
-            #high
-            #if self.TRAJECTORY.trajectory_list[0]["type"] == "non_boundary":
-            # target_vel = 9.0 + 2.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
-            #elif self.TRAJECTORY.trajectory_list[0]["type"] == "boundary":
-                #target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
 
-            rate__ = trajectory_achivement_data[self.nearestIndex]
-            # low
-            target_vel = 2.0 + 1.5 * np.sin(2.0 * np.pi * rate__  - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate__  - np.pi) - np.pi)
-            #middle low
-            target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate__  - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate__  - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
-            #middle high
-            target_vel = 6.0 + 3.0 * np.sin(2.0 * np.pi * rate__  - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate__  - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
-            #high
-            #if self.TRAJECTORY.trajectory_list[0]["type"] == "non_boundary":
-            # target_vel = 9.0 + 2.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)#self.get_target_velocity(nearestIndex)
-            #elif self.TRAJECTORY.trajectory_list[0]["type"] == "boundary":
-                #target_vel = 4.0 + 3.0 * np.sin(2.0 * np.pi * rate - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate - np.pi) - np.pi)
+            T = 10.0
+            current_time = self.get_clock().now().nanoseconds / 1e9
+            max_vel_from_lateral_acc = np.sqrt( 2.25 / max_curvature_on_segment )
+
+            if (
+                current_time - self.previous_updated_time > 3 * T or self.collected_data_counts_of_vel_acc[self.vel_idx,self.acc_idx] > np.max([np.mean(self.collected_data_counts_of_vel_acc)*1.1,50])# or self.target_vel_on_line > max_vel_from_lateral_acc
+            ):
+                min_data_num_margin = 20
+                min_index_list = []
+                
+                min_num_data = 1e12
+                N_V = self.num_bins_v
+                N_A  = self.num_bins_a
 
 
-            cos_theta = cos(trajectory_yaw_data[self.nearestIndex + 20])
-            sin_theta = sin(trajectory_yaw_data[self.nearestIndex + 20])
-            eps = 0.3 / target_vel * np.sin(rate__ * self.TRAJECTORY.trajectory_list[0]["total_distance"])
-            eps_vec = rot_matrix@np.array([eps * sin_theta, eps * cos_theta])
-            eps_theta =  np.arctan2(0.3  * np.cos(rate__ * self.TRAJECTORY.trajectory_list[0]["total_distance"]), 1.0)
+                # do not collect data when velocity and acceleration are low
+                exclude_idx_list = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (0, 2)]
+                # do not collect data when velocity and acceleration are high
+                exclude_idx_list += [
+                    (-1 + N_V, -1 + N_A),
+                    (-2 + N_V, -1 + N_A),
+                    (-3 + N_V, -1 + N_A),
+                    (-1 + N_V, -2 + N_A), 
+                    (-2 + N_V, -2 + N_A),
+                    (-1 + N_V, -3 + N_A),
+                ]
 
-            self.get_logger().info(str(eps_vec))
+                for i in range(self.collecting_data_min_n_v, self.collecting_data_max_n_v):
+                    for j in range(self.collecting_data_min_n_a, self.collecting_data_max_n_a):
+                        if (i, j) not in exclude_idx_list:
+                            if (
+                                min_num_data
+                                > self.collected_data_counts_of_vel_acc[i, j]
+                            ):
+                                min_num_data = self.collected_data_counts_of_vel_acc[i, j]
+                                min_index_list.clear()
+                                min_index_list.append((j, i))
 
-            trajectory_position_data += rot_matrix@eps_vec
-            trajectory_yaw_data += eps_theta
+                            elif (
+                                min_num_data + min_data_num_margin
+                                > self.collected_data_counts_of_vel_acc[i, j]
+                            ):
+                                min_index_list.append((j, i))
+                self.get_logger().info(str(min_index_list))
+                self.acc_idx, self.vel_idx = min_index_list[np.random.randint(0, len(min_index_list))]
+                self.target_acc_on_line = self.a_bin_centers[self.acc_idx]
+                self.target_vel_on_line = self.v_bin_centers[self.vel_idx]
+
+                self.get_logger().info( "target velocity is updated : " + str(self.target_vel_on_line) )
+
+                self.previous_updated_time = current_time
+
+            rate__ = trajectory_achievement_data[self.nearestIndex]
+            if current_time - self.previous_updated_time <  T:
+                amp = np.min([2.0, self.target_vel_on_line * 0.8])
+                target_vel = (self.target_vel_on_line - amp) + amp * np.sin(2.0 * np.pi * rate__  - np.pi) * np.sin(2.0 * np.pi * np.sin(2.0 * np.pi * rate__  - np.pi) - np.pi)
+            else:
+                sign = np.sign(np.sin(2 * np.pi * current_time / T))
+                current_acc = self._present_acceleration.accel.accel.linear.x
+                target_vel = 350.0 * ( abs(self.target_acc_on_line)* sign - current_acc )
+        
+                target_vel = np.min([target_vel, self.target_vel_on_line + 1.0])
+                target_vel = np.max([target_vel, np.max(self.target_vel_on_line - 1.0), 0.5])
+            
+            #target_vel = 5.0 + 2.5 * np.sin(current_time * np.pi * 2.0 / 10.0)
+            if self.collection_mode == "steer" or self.collection_mode == "steer_stack":
+                T = 10.0
+                target_vel = 3.5 + 3.0 * np.sin(2.0 * np.pi * current_time / T) * np.sin(1.0 * np.pi * np.sin( np.sin(2.0 * np.pi * current_time / T) ) )
+            target_vel = np.min([max_vel_from_lateral_acc, target_vel])
 
             trajectory_longitudinal_velocity_data = np.array(
                 [target_vel for _ in range(len(trajectory_longitudinal_velocity_data))]
@@ -1235,7 +1278,6 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 nearest_yaw += 2 * np.pi
 
             tmp_yaw_error = np.abs(present_yaw - nearest_yaw)
-            self.get_logger().info(str(tmp_yaw_error))
             
             if lateral_error_threshold < tmp_lateral_error or yaw_error_threshold < tmp_yaw_error:
                 if Differential_Smoothing_Flag:
@@ -1458,8 +1500,20 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
             if self.nearestIndex > self.TRAJECTORY.trajectory_length_list[0]:
                 self.TRAJECTORY.remove_trajectory()
+
+                if self.collection_mode == "steer":
+                    self.TRAJECTORY.add_inversion_trajectory(0.6)
+                    self.TRAJECTORY.add_inversion_trajectory(0.6)
+                    self.TRAJECTORY.add_inversion_trajectory(0.4)
+                    self.TRAJECTORY.add_inversion_trajectory(0.4)
+                    #self.TRAJECTORY.add_inversion_trajectory(0.3)
+                    #self.TRAJECTORY.add_inversion_trajectory(0.3)
+                    self.collection_mode = "steer_stack"
+
                 while len(self.TRAJECTORY.trajectory_length_list) < 3:
                     self.TRAJECTORY.add_steer_trajectory(random.randint(0,len(self.TRAJECTORY.steer_list)-1))
+                    self.collection_mode = "steer_finish"
+
 
 def main(args=None):
     rclpy.init(args=args)

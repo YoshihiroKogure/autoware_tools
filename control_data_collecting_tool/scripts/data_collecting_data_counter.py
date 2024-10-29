@@ -212,8 +212,9 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
                     current_time += self.timer_period_callback
 
     def count_observations(self, v, a, steer):
-        steer_rate = (steer - self.previous_steer) / 0.033
-        steer_rate_abs_mean = np.mean(np.abs(list(self.steer_rate_hist)[0:16]))
+        steer_rate = (steer - self.previous_steer) / 0.03
+        self.get_logger().info("stee rate : " + str(steer_rate))
+        steer_rate_abs_mean = np.mean(np.abs(list(self.steer_rate_hist)[0]))
         v_bin = np.digitize(v, self.v_bins) - 1
         steer_bin = np.digitize(steer, self.steer_bins) - 1
         steer_rate_bin = np.digitize(steer_rate_abs_mean, self.steer_rate_bins) - 1
@@ -256,7 +257,7 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
 
                 self.acc_hist.append(float(current_acc))
                 self.vel_hist.append(float(current_vel))
-                self.steer_rate_hist.append(float(self.current_steer_rate))
+                self.steer_rate_hist.append(abs(float(self.current_steer_rate)))
 
         # publish collected_data_counts_of_vel_acc
         publish_Int32MultiArray(
