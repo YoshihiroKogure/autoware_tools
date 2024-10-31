@@ -16,6 +16,7 @@
 
 from autoware_adapi_v1_msgs.msg import OperationModeState
 from geometry_msgs.msg import AccelWithCovarianceStamped
+from autoware_vehicle_msgs.msg import ControlModeReport
 from nav_msgs.msg import Odometry
 import numpy as np
 from rcl_interfaces.msg import ParameterDescriptor
@@ -108,6 +109,13 @@ class DataCollectingBaseNode(Node):
             10,
         )
 
+        self.control_mode_subscription_ = self.create_subscription(
+            ControlModeReport,
+            "/vehicle/status/control_mode",
+            self.subscribe_control_mode,
+            10,
+        )
+
         self._present_kinematic_state = None
         self._present_acceleration = None
         self.present_operation_mode_ = None
@@ -166,3 +174,6 @@ class DataCollectingBaseNode(Node):
 
     def subscribe_operation_mode(self, msg):
         self.present_operation_mode_ = msg.mode
+
+    def subscribe_control_mode(self, msg):
+        self._present_control_mode_ = msg.mode

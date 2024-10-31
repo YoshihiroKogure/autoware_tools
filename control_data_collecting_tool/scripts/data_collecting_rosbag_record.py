@@ -29,6 +29,7 @@ from rosbag2_py import StorageOptions
 from rosbag2_py._storage import TopicMetadata
 from rosidl_runtime_py.utilities import get_message
 import yaml
+from autoware_vehicle_msgs.msg import ControlModeReport
 
 
 class MessageWriter:
@@ -138,6 +139,15 @@ class DataCollectingRosbagRecord(Node):
             self.subscribe_operation_mode,
             10,
         )
+
+        self._present_control_mode_ = None
+        self.control_mode_subscription_ = self.create_subscription(
+            ControlModeReport,
+            "/vehicle/status/control_mode",
+            self.subscribe_control_mode,
+            10,
+        )
+
         self.operation_mode_subscription_
 
         self.timer_period_callback = 1.0
@@ -149,20 +159,23 @@ class DataCollectingRosbagRecord(Node):
     def subscribe_operation_mode(self, msg):
         self.present_operation_mode_ = msg.mode
 
+    def subscribe_control_mode(self, msg):
+        self._present_control_mode_ = msg.mode
+
     def record_message(self):
-        # Start subscribing to topics and recording if the operation mode is 3(LOCAL)
-        if self.present_operation_mode_ == 3 and not self.subscribed and not self.recording:
+        # Start subscribing to topics and recording if the operation mode is 3(LOCAL) and control mode is 1(AUTONOMOUS)
+        if self.present_operation_mode_ == 3 and self._present_control_mode_ == 1 and not self.subscribed and not self.recording:
             self.writer.create_writer()
             self.writer.subscribe_topics()
             self.subscribed = True
 
-        # Start recording if topics are subscribed and the operation mode is 3
-        if self.present_operation_mode_ == 3 and self.subscribed and not self.recording:
+        # Start recording if topics are subscribed and the operation mode is 3(LOCAL)
+        if self.present_operation_mode_ == 3 and self._present_control_mode_ == 1 and self.subscribed and not self.recording:
             self.writer.start_record()
             self.recording = True
 
-        # Stop recording if the operation mode changes from 3
-        if self.present_operation_mode_ != 3 and self.subscribed and self.recording:
+        # Stop recording if the operation mode changes from 3(LOCAL) 
+        if (self.present_operation_mode_ != 3 or self._present_control_mode_ != 1) and self.subscribed and self.recording:
             self.writer.stop_record()
             self.subscribed = False
             self.recording = False
