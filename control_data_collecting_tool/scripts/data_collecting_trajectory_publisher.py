@@ -624,11 +624,11 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 or self.COURSE_NAME == "straight_line_negative"
             ):
                 if self.target_vel_on_line > self.v_max * 3.0 / 4.0:
-                    self.deceleration_rate = 0.55 + 0.10
+                    self.deceleration_rate = 0.55
                 elif self.target_vel_on_line > self.v_max / 2.0:
-                    self.deceleration_rate = 0.65 + 0.10
+                    self.deceleration_rate = 0.65
                 else:
-                    self.deceleration_rate = 0.85 + 0.10
+                    self.deceleration_rate = 0.85
 
             elif self.COURSE_NAME == "eight_course":
                 if self.target_vel_on_line > self.v_max * 3.0 / 4.0:
