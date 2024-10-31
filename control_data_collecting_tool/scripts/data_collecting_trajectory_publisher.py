@@ -40,6 +40,9 @@ CIRCLE_RADIUS = 35
 # CIRCLE_RADIUS = 40
 OUTER_CIRCLE_RADIUS = CIRCLE_RADIUS + 5
 
+dead_band_delta_acc = 0.01
+dead_band_delat_vel = dead_band_delta_acc * 0.03
+
 debug_matplotlib_plot_flag = False
 Differential_Smoothing_Flag = True
 USE_CURVATURE_RADIUS_FLAG = False
@@ -547,6 +550,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         self.near_target_vel = False
         self.previous_target_vel = 4.0
         self.acc_hist = deque([float(0.0)] * 10, maxlen=10)
+        self.vel_hist = deque([float(0.0)] * 10, maxlen=10)
 
         self.index_array_near = [0]
 
@@ -806,15 +810,26 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         if current_time - self.previous_updated_time < 1.0 * T and not self.near_target_vel:
 
             self.phase_shift = current_time - self.previous_updated_time
-            target_vel = np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line), 0.05]) + np.clip(-(0.5 * (current_vel - np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line),0.05])))**3, -0.5, 0.5)#- self.target_acc_on_line / 2
+
+            delta_vel =   (current_vel - np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line),0.05]))
+            if abs(delta_vel) < dead_band_delat_vel:
+                delta_vel = 0.0 
+
+            target_vel = np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line), 0.05]) + np.clip(-(0.5 * delta_vel)**3, -0.5, 0.5)#- self.target_acc_on_line / 2
             target_vel = np.max([target_vel, 0.05])
+
+            self.vel_hist.append(target_vel)
+            target_vel = np.mean(self.vel_hist)
         else:
             if current_vel < np.max([(self.target_vel_on_line - 1.0 * abs(self.target_acc_on_line)), 0.05]):
                 self.acc_on_line = abs(self.target_acc_on_line)
             elif current_vel > self.target_vel_on_line + 1.0 * abs(self.target_acc_on_line):
                 self.acc_on_line = -abs(self.target_acc_on_line)
-
-            target_vel = current_vel + np.clip(self.acc_on_line / 1.0 -(20.0 * ( current_acc - self.acc_on_line ))**3, -1.0, 1.0)
+            
+            delta_acc = current_acc - self.acc_on_line
+            if abs(delta_acc) < dead_band_delta_acc:
+                delta_acc = 0.0
+            target_vel = current_vel + np.clip(self.acc_on_line / 1.0 -(20.0 *  delta_acc)**3, -1.0, 1.0)
 
         #if self.collection_mode == "steer" or self.collection_mode == "steer_stack":
             #T = 20.0
