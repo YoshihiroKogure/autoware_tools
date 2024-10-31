@@ -590,7 +590,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         target_vel = min([self.v_max / N_V, max_vel_from_lateral_acc])
 
         # set self.target_acc_on_line and self.target_vel_on_line after vehicle from circle part to linear part
-        min_data_num_margin = 20
+        min_data_num_margin = 30
         min_index_list = []
         if (
             (self.prev_part == "left_circle" or self.prev_part == "right_circle")
