@@ -416,6 +416,12 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             1,
         )
 
+        self.enclosing_trajectory_for_collecting_data_pub_ = self.create_publisher(
+            Trajectory,
+            "/data_collecting_enclosing_trajectory",
+            1,
+        )
+
         self.data_collecting_trajectory_marker_array_pub_ = self.create_publisher(
             MarkerArray,
             "/data_collecting_trajectory_marker_array",
@@ -478,6 +484,11 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         self.trajectory_yaw_data = None
         self.trajectory_longitudinal_velocity_data = None
         self.trajectory_curvature_data = None
+        
+
+        self.enclosing_trajectory_position_data = None
+        self.enclosing_trajectory_yaw_data = None
+        self.enclosing_trajectory_longitudinal_velocity_data = None
         self.current_target_longitudinal_velocity = (
             self.get_parameter("target_longitudinal_velocity").get_parameter_value().double_value
         )
@@ -928,7 +939,13 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 self.trajectory_parts,
                 self.trajectory_achievement_rates,
             ) = self.TRAJECTORY.get_reversal_loop_circle_trajectory_points()
-
+            
+            R = 45.0
+            N = 200
+            self.enclosing_trajectory_position_data = np.array([[R * np.cos(2 * np.pi * i / N),
+                                                                            R * np.sin(2 * np.pi * i / N)] for i in range(N+1)])
+            self.enclosing_trajectory_yaw_data = np.array([2 * np.pi * i / N for i in range(N+1)])
+            self.enclosing_trajectory_longitudinal_velocity_data = np.zeros(N+1)
         else:
             self.trajectory_position_data = None
             self.trajectory_yaw_data = None
@@ -951,6 +968,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         trajectory_position_data = (rot_matrix @ trajectory_position_data.T).T
         trajectory_position_data += rectangle_center_position
         trajectory_yaw_data += yaw_offset
+
+        if self.COURSE_NAME== "reversal_loop_circle":
+            self.enclosing_trajectory_position_data += rectangle_center_position
 
         # [2-3] smoothing figure eight path
         window = self.get_parameter("mov_ave_window").get_parameter_value().integer_value
@@ -1123,19 +1143,33 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             data_collecting_area[2][0:2],
             data_collecting_area[3][0:2],
         )
+
+        origin = (A + B + C + D) / 4.0
         P = current_pos[0:2]
 
-        area_ABCD = computeTriangleArea(A, B, C) + computeTriangleArea(C, D, A)
+        if (
+                self.COURSE_NAME == "eight_course"
+                or self.COURSE_NAME == "u_shaped_return"
+                or self.COURSE_NAME == "straight_line_positive"
+                or self.COURSE_NAME == "straight_line_negative"
+            ):
+            area_ABCD = computeTriangleArea(A, B, C) + computeTriangleArea(C, D, A)
 
-        area_PAB = computeTriangleArea(P, A, B)
-        area_PBC = computeTriangleArea(P, B, C)
-        area_PCD = computeTriangleArea(P, C, D)
-        area_PDA = computeTriangleArea(P, D, A)
+            area_PAB = computeTriangleArea(P, A, B)
+            area_PBC = computeTriangleArea(P, B, C)
+            area_PCD = computeTriangleArea(P, C, D)
+            area_PDA = computeTriangleArea(P, D, A)
 
-        if area_PAB + area_PBC + area_PCD + area_PDA > area_ABCD * 1.001:
-            return False
-        else:
-            return True
+            if area_PAB + area_PBC + area_PCD + area_PDA > area_ABCD * 1.001:
+                return False
+            else:
+                return True
+        elif self.COURSE_NAME == "reversal_loop_circle":
+            dist_to_origin = np.linalg.norm(origin - P)
+            if dist_to_origin < 45:
+                return True
+            else:
+                False
 
     def timer_callback_traj(self):
         if (
@@ -1226,6 +1260,15 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     [self.TRAJECTORY.trajectory_list[i]["achievement_rates"] for i in range(3)],
                     axis=0,
                 )
+
+                '''R = 45.0
+                N = 200
+                self.enclosing_trajectory_position_data = np.array([[R * np.cos(2 * np.pi * i / N),
+                                                                                R * np.sin(2 * np.pi * i / N)] for i in range(N+1)])
+                self.enclosing_trajectory_yaw_data = np.array([2 * np.pi * i / N for i in range(N+1)])
+                self.enclosing_trajectory_longitudinal_velocity_data = np.zeros(N+1)
+
+                self.enclosing_trajectory_position_data += rectangle_center_position'''
 
             # [3] prepare velocity noise
             while True:
@@ -1444,6 +1487,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
             self.trajectory_for_collecting_data_pub_.publish(tmp_traj)
 
+
             # [6-2] publish marker_array
             marker_array = MarkerArray()
 
@@ -1476,6 +1520,37 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 marker_traj1.points.append(tmp_marker_point)
 
             marker_array.markers.append(marker_traj1)
+
+            # for enclosing circle
+            if self.COURSE_NAME == "reversal_loop_circle":
+                self.get_logger().info("reversal !!!!")
+                enclosing_marker_traj1 = Marker()
+                enclosing_marker_traj1.type = 4
+                enclosing_marker_traj1.id = 1
+                enclosing_marker_traj1.header.frame_id = "map"
+
+                enclosing_marker_traj1.action = enclosing_marker_traj1.ADD
+
+                enclosing_marker_traj1.scale.x = 0.4
+                enclosing_marker_traj1.scale.y = 0.0
+                enclosing_marker_traj1.scale.z = 0.0
+
+                enclosing_marker_traj1.color.a = 1.0
+                enclosing_marker_traj1.color.r = 0.0
+                enclosing_marker_traj1.color.g = 1.0
+                enclosing_marker_traj1.color.b = 0.0
+
+                enclosing_marker_traj1.lifetime.nanosec = 500000000
+                enclosing_marker_traj1.frame_locked = True
+                enclosing_marker_traj1.points = []
+                for i in range(len(self.enclosing_trajectory_position_data)):
+                    enclosing_tmp_marker_point = Point()
+                    enclosing_tmp_marker_point.x = self.enclosing_trajectory_position_data[i, 0]
+                    enclosing_tmp_marker_point.y = self.enclosing_trajectory_position_data[i, 1]
+                    enclosing_tmp_marker_point.z = 0.0
+                    enclosing_marker_traj1.points.append(enclosing_tmp_marker_point)
+
+                marker_array.markers.append(enclosing_marker_traj1)
 
             # [6-2b] whole trajectory
             marker_traj2 = Marker()
