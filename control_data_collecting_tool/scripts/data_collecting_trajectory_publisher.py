@@ -36,6 +36,10 @@ from std_msgs.msg import Int32MultiArray
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 
+CIRCLE_RADIUS = 35
+# CIRCLE_RADIUS = 40
+OUTER_CIRCLE_RADIUS = CIRCLE_RADIUS + 5
+
 debug_matplotlib_plot_flag = False
 Differential_Smoothing_Flag = True
 USE_CURVATURE_RADIUS_FLAG = False
@@ -441,10 +445,12 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             1,
         )
 
-        self.TRAJECTORY = calc_trajectory(40)
+        self.steer_list = [1.2, 0.5, 0.5, 0.6, 0.6]
+        self.steer_count = 0
+        self.TRAJECTORY = calc_trajectory(CIRCLE_RADIUS)
         self.TRAJECTORY.add_steer_trajectory()
         self.TRAJECTORY.add_steer_trajectory()
-        self.TRAJECTORY.add_inversion_trajectory(random.choice([0.5, 0.6, 0.7]))
+        self.TRAJECTORY.add_inversion_trajectory(self.steer_list[self.steer_count%len(self.steer_list)])
 
         self.previous_updated_time = 0.0
 
@@ -744,7 +750,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         if (
             current_time - self.previous_updated_time > 3.00 * T
             or self.collected_data_counts_of_vel_acc[self.vel_idx, self.acc_idx]
-            > 50  or self.target_vel_on_line > max_vel_from_lateral_acc
+            > np.max([50, np.mean(np.minimum(self.collected_data_counts_of_vel_acc, 200))])  or self.target_vel_on_line > max_vel_from_lateral_acc
         ):
             min_data_num_margin = 20
             min_index_list = []
@@ -768,7 +774,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             for i in range(self.collecting_data_min_n_v, self.collecting_data_max_n_v):
                 for j in range(self.collecting_data_min_n_a, self.collecting_data_max_n_a):
                     if (i, j) not in exclude_idx_list:
-                        if min_num_data > self.collected_data_counts_of_vel_acc[i, j]:
+                        if min_num_data - min_data_num_margin > self.collected_data_counts_of_vel_acc[i, j]:
                             min_num_data = self.collected_data_counts_of_vel_acc[i, j]
                             min_index_list.clear()
                             min_index_list.append((j, i))
@@ -793,14 +799,14 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         self.acc_hist.append(float(current_acc))
 
         #self.phase_shift = T
-        if abs(current_vel - np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line), 0.05]) ) <   0.5 and not self.near_target_vel:
+        if abs(current_vel - np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line), 0.05]) ) <   0.1 and not self.near_target_vel:
             self.near_target_vel = True
             self.phase_shift = current_time - self.previous_updated_time
 
         if current_time - self.previous_updated_time < 1.0 * T and not self.near_target_vel:
 
             self.phase_shift = current_time - self.previous_updated_time
-            target_vel = np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line),0.05]) + np.clip(-(1.0 * (current_vel - np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line),0.05])))**3, -0.5, 0.5)#- self.target_acc_on_line / 2
+            target_vel = np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line), 0.05]) + np.clip(-(0.5 * (current_vel - np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line),0.05])))**3, -0.5, 0.5)#- self.target_acc_on_line / 2
             target_vel = np.max([target_vel, 0.05])
         else:
             if current_vel < np.max([(self.target_vel_on_line - 1.0 * abs(self.target_acc_on_line)), 0.05]):
@@ -808,7 +814,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             elif current_vel > self.target_vel_on_line + 1.0 * abs(self.target_acc_on_line):
                 self.acc_on_line = -abs(self.target_acc_on_line)
 
-            target_vel = current_vel + np.clip(self.acc_on_line / 1.0 -(10.0 * ( current_acc - self.acc_on_line ))**3, -1.0, 1.0)
+            target_vel = current_vel + np.clip(self.acc_on_line / 1.0 -(20.0 * ( current_acc - self.acc_on_line ))**3, -1.0, 1.0)
 
         #if self.collection_mode == "steer" or self.collection_mode == "steer_stack":
             #T = 20.0
@@ -819,10 +825,14 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         target_vel = np.min([max_vel_from_lateral_acc, target_vel])
 
         if self.TRAJECTORY.trajectory_list[0]["reversing"] == True or self.TRAJECTORY.trajectory_list[1]["reversing"] == True:
-            target_vel = 3.0 + 3.0 * np.sin(0.5 * np.pi * current_time / T) * np.sin(1 * np.pi * current_time / T)
+            target_vel = 3.0 + 3.0 * np.sin(0.25 * np.pi * current_time / T) * np.sin(0.5 * np.pi * current_time / T)
 
             if self.TRAJECTORY.trajectory_list[1]["reversing"] == True:
                 target_vel = 3.0
+
+ 
+            if max_curvature_on_segment > 0.7:
+                target_vel = np.min([max_vel_from_lateral_acc, target_vel])
 
         target_vel = np.max([target_vel, 0.05])
 
@@ -940,10 +950,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 self.trajectory_achievement_rates,
             ) = self.TRAJECTORY.get_reversal_loop_circle_trajectory_points()
             
-            R = 45.0
             N = 200
-            self.enclosing_trajectory_position_data = np.array([[R * np.cos(2 * np.pi * i / N),
-                                                                            R * np.sin(2 * np.pi * i / N)] for i in range(N+1)])
+            self.enclosing_trajectory_position_data = np.array([[OUTER_CIRCLE_RADIUS * np.cos(2 * np.pi * i / N),
+                                                                            OUTER_CIRCLE_RADIUS * np.sin(2 * np.pi * i / N)] for i in range(N+1)])
             self.enclosing_trajectory_yaw_data = np.array([2 * np.pi * i / N for i in range(N+1)])
             self.enclosing_trajectory_longitudinal_velocity_data = np.zeros(N+1)
         else:
@@ -1166,7 +1175,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 return True
         elif self.COURSE_NAME == "reversal_loop_circle":
             dist_to_origin = np.linalg.norm(origin - P)
-            if dist_to_origin < 45:
+            if dist_to_origin < OUTER_CIRCLE_RADIUS:
                 return True
             else:
                 False
@@ -1261,10 +1270,10 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     axis=0,
                 )
 
-                '''R = 45.0
+                '''
                 N = 200
-                self.enclosing_trajectory_position_data = np.array([[R * np.cos(2 * np.pi * i / N),
-                                                                                R * np.sin(2 * np.pi * i / N)] for i in range(N+1)])
+                self.enclosing_trajectory_position_data = np.array([[OUTER_CIRCLE_RADIUS * np.cos(2 * np.pi * i / N),
+                                                                                OUTER_CIRCLE_RADIUS * np.sin(2 * np.pi * i / N)] for i in range(N+1)])
                 self.enclosing_trajectory_yaw_data = np.array([2 * np.pi * i / N for i in range(N+1)])
                 self.enclosing_trajectory_longitudinal_velocity_data = np.zeros(N+1)
 
@@ -1523,7 +1532,6 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
             # for enclosing circle
             if self.COURSE_NAME == "reversal_loop_circle":
-                self.get_logger().info("reversal !!!!")
                 enclosing_marker_traj1 = Marker()
                 enclosing_marker_traj1.type = 4
                 enclosing_marker_traj1.id = 1
@@ -1707,7 +1715,8 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     while len(self.TRAJECTORY.trajectory_length_list) < 3:
                         self.TRAJECTORY.add_steer_trajectory()
                         self.TRAJECTORY.add_steer_trajectory()
-                        self.TRAJECTORY.add_inversion_trajectory(random.choice([0.5, 0.6, 0.7]))
+                        self.steer_count += 1
+                        self.TRAJECTORY.add_inversion_trajectory(self.steer_list[self.steer_count%len(self.steer_list)])
 
 
 def main(args=None):

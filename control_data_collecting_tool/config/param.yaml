@@ -19,11 +19,11 @@
     A_MAX: 1.0
 
     COLLECTING_DATA_V_MIN: 0.5
-    COLLECTING_DATA_V_MAX: 8.5
-    COLLECTING_DATA_A_MIN: -1.0
-    COLLECTING_DATA_A_MAX: 1.0
+    COLLECTING_DATA_V_MAX: 7.5
+    COLLECTING_DATA_A_MIN: 0.15
+    COLLECTING_DATA_A_MAX: 0.15
 
-    max_lateral_accel: 2.0
+    max_lateral_accel: 2.25
     lateral_error_threshold: 2.00
     yaw_error_threshold: 0.5
     velocity_limit_by_tracking_error: 2.0
