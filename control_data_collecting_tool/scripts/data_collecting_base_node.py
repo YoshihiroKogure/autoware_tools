@@ -148,7 +148,9 @@ class DataCollectingBaseNode(Node):
 
         self.v_bins = np.linspace(self.v_min, self.v_max, self.num_bins_v + 1)
         self.steer_bins = np.linspace(self.steer_min, self.steer_max, self.num_bins_steer + 1)
-        self.steer_rate_bins = np.linspace(self.steer_rate_min, self.steer_rate_max, self.num_bins_steer_rate + 1)
+        self.steer_rate_bins = np.linspace(
+            self.steer_rate_min, self.steer_rate_max, self.num_bins_steer_rate + 1
+        )
         self.a_bins = np.linspace(self.a_min, self.a_max, self.num_bins_a + 1)
 
         self.v_bin_centers = (self.v_bins[:-1] + self.v_bins[1:]) / 2

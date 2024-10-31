@@ -54,6 +54,7 @@ def publish_Int32MultiArray(publisher_, array_data):
 
     publisher_.publish(msg)
 
+
 # inherits from DataCollectingBaseNode
 class DataCollectingDataCounter(DataCollectingBaseNode):
     def __init__(self):
@@ -77,7 +78,9 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
         )
 
         self.collected_data_counts_of_vel_steer_rate_publisher_ = self.create_publisher(
-            Int32MultiArray, "/control_data_collecting_tools/collected_data_counts_of_vel_steer_rate", 10
+            Int32MultiArray,
+            "/control_data_collecting_tools/collected_data_counts_of_vel_steer_rate",
+            10,
         )
 
         self.vel_hist_publisher_ = self.create_publisher(
@@ -96,7 +99,7 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
         )
 
         self.previous_steer = 0.0
-        
+
         load_rosbag2_files = (
             self.get_parameter("LOAD_ROSBAG2_FILES").get_parameter_value().bool_value
         )
@@ -104,11 +107,10 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
         if load_rosbag2_files:
             # candidates referencing the rosbag data
             rosbag2_dir_list = [d for d in os.listdir("./") if os.path.isdir(os.path.join("./", d))]
-            # load rosbag data 
+            # load rosbag data
             self.load_rosbag_data(rosbag2_dir_list)
 
     def load_rosbag_data(self, rosbag2_dir_list):
-
         for rosbag2_dir in rosbag2_dir_list:
             # try to fetch /localization/acceleration and /localization/kinematic_state from rosbag2_file
             rosbag2_file = "./" + rosbag2_dir + "/" + rosbag2_dir + "_0.db3"
@@ -196,11 +198,11 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
                         current_time - previous_kinematic_time
                     ) * previous_ang_vel_z
                     ang_vel_z /= current_kinematic_time - previous_kinematic_time
-                    
+
                     # calculation of steer
                     wheel_base = self.get_parameter("wheel_base").get_parameter_value().double_value
                     steer = arctan2(wheel_base * ang_vel_z, kinematic_state.twist.twist.linear.x)
-                    
+
                     # count number of data
                     if kinematic_state.twist.twist.linear.x > 1e-3:
                         self.count_observations(
@@ -213,7 +215,6 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
 
     def count_observations(self, v, a, steer):
         steer_rate = (steer - self.previous_steer) / 0.03
-        self.get_logger().info("stee rate : " + str(steer_rate))
         steer_rate_abs_mean = np.mean(np.abs(list(self.steer_rate_hist)[0]))
         v_bin = np.digitize(v, self.v_bins) - 1
         steer_bin = np.digitize(steer, self.steer_bins) - 1
@@ -237,7 +238,11 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
 
     # call back for counting data points
     def timer_callback_counter(self):
-        if self._present_kinematic_state is not None and self._present_acceleration is not None and self.present_operation_mode_ == 3:
+        if (
+            self._present_kinematic_state is not None
+            and self._present_acceleration is not None
+            and self.present_operation_mode_ == 3
+        ):
             # calculate steer
             angular_z = self._present_kinematic_state.twist.twist.angular.z
             wheel_base = self.get_parameter("wheel_base").get_parameter_value().double_value

@@ -6,6 +6,7 @@
     # COURSE_NAME: u_shaped_return
     # COURSE_NAME: straight_line_positive
     # COURSE_NAME: straight_line_negative
+    # COURSE_NAME: reversal_loop_circle
 
     NUM_BINS_V: 10
     NUM_BINS_STEER: 20
@@ -22,10 +23,10 @@
     COLLECTING_DATA_A_MIN: -1.0
     COLLECTING_DATA_A_MAX: 1.0
 
-    max_lateral_accel: 2.25
-    lateral_error_threshold: 2.79
+    max_lateral_accel: 2.0
+    lateral_error_threshold: 2.00
     yaw_error_threshold: 0.5
-    velocity_limit_by_tracking_error: 6.0
+    velocity_limit_by_tracking_error: 2.0
     mov_ave_window: 100
     target_longitudinal_velocity: 6.0
     longitudinal_velocity_noise_amp: 0.01
@@ -37,7 +38,7 @@
     wheel_base: 2.79
     acc_kp: 1.0
     lookahead_time: 2.0
-    min_lookahead: 2.0
+    min_lookahead: 4.0
     linearized_pure_pursuit_steer_kp_param: 2.0
     linearized_pure_pursuit_steer_kd_param: 2.0
     stop_acc: -2.0
@@ -45,10 +46,10 @@
     lon_acc_lim: 1.5
     lon_jerk_lim: 0.5
     steer_lim: 0.6
-    steer_rate_lim: 3.0
+    steer_rate_lim: 0.6
     acc_noise_amp: 0.01
     acc_noise_min_period: 5.0
     acc_noise_max_period: 20.0
-    steer_noise_amp: 0.1
+    steer_noise_amp: 0.01
     steer_noise_min_period: 1.0
     steer_noise_max_period: 5.0

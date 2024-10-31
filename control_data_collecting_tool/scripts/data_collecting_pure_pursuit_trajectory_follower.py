@@ -18,8 +18,8 @@ from autoware_adapi_v1_msgs.msg import OperationModeState
 from autoware_control_msgs.msg import Control as AckermannControlCommand
 from autoware_planning_msgs.msg import Trajectory
 from autoware_vehicle_msgs.msg import GearCommand
-from geometry_msgs.msg import Point
 from geometry_msgs.msg import AccelWithCovarianceStamped
+from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 import numpy as np
 from rcl_interfaces.msg import ParameterDescriptor
@@ -29,6 +29,7 @@ from scipy.spatial.transform import Rotation as R
 from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+from scipy.interpolate import interp1d
 
 debug_matplotlib_plot_flag = False
 if debug_matplotlib_plot_flag:
@@ -114,7 +115,7 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
 
         self.declare_parameter(
             "lon_jerk_lim",
-            5.0,
+            0.5,
             ParameterDescriptor(description="Longitudinal jerk limit [m/sss]"),
         )
 
@@ -181,7 +182,7 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
             1,
         )
         self.sub_acceleration_
-        
+
         self.sub_trajectory_ = self.create_subscription(
             Trajectory,
             "/data_collecting_trajectory",
@@ -242,14 +243,19 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
 
         self.num_bins_v = 10
         self.v_min, self.v_max = 0.0, 12.0
-        self.num_bins_a = 40
-        self.a_min, self.a_max = -2.0, 2.0
+        self.num_bins_a = 20
+        self.a_min, self.a_max = -2.5, 2.5
 
         self.v_bins = np.linspace(self.v_min, self.v_max, self.num_bins_v + 1)
         self.a_bins = np.linspace(self.a_min, self.a_max, self.num_bins_a + 1)
 
+        self.a_bins_center = (self.a_bins[1:] + self.a_bins[:-1]) / 2.0
+
         self.accel_modifier_count = np.zeros((self.num_bins_v, self.num_bins_a))
-        self.accel_modifier = np.zeros((self.num_bins_v, self.num_bins_a)) + np.linspace(self.a_min, self.a_max, self.num_bins_a)
+        self.accel_modifier = np.zeros((self.num_bins_v, self.num_bins_a)) + np.linspace(
+            self.a_min, self.a_max, self.num_bins_a
+        )
+        self.accel_modifier_interpolated = self.accel_modifier.copy()
 
         self.distance = 0.0
 
@@ -488,7 +494,7 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
         elif pure_pursuit_type == "linearized":
             cmd = self.linearized_pure_pursuit_control(
                 present_position[:2],
-                present_yaw + ( np.random.rand() - 0.5 ) * 0.2 ,
+                present_yaw + (np.random.rand() - 0.5) * 0.2,
                 present_linear_velocity[0],
                 trajectory_position[targetIndex][:2],
                 getYaw(trajectory_orientation[targetIndex]),
@@ -500,17 +506,20 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
                 % pure_pursuit_type
             )
 
-        self.update_accel_modifier(present_linear_velocity[0], self._present_acceleration_.accel.accel.linear.x, self._previous_cmd[0])
-        cmd[0] = self.return_accel_modifier(present_linear_velocity[0], cmd[0])
+        '''self.update_accel_modifier(
+            present_linear_velocity[0],
+            self._present_acceleration_.accel.accel.linear.x,
+            self._previous_cmd[0],
+        )
+        cmd[0] = self.return_accel_modifier(present_linear_velocity[0], cmd[0])'''
         cmd_without_noise = 1 * cmd
 
         tmp_acc_noise = self.acc_noise_list.pop(0)
         tmp_steer_noise = self.steer_noise_list.pop(0)
 
         cmd[0] += tmp_acc_noise
-        self.distance += 0.033 * 5.0#present_linear_velocity[0] * 0.033 * 10.0
-        cmd[1] += 0.10 * np.sin(0.25 * np.pi * self.distance )* np.sin(0.125 * np. pi * np.sin(1.0 * np.pi * self.distance ))
-        #cmd[1] += 0.10 * np.sin(0.5 * np.pi * self.distance )* np.sin(0.25 * np. pi * np.sin(2.0 * np.pi * self.distance )) 
+        self.distance += 0.033 * 5.0  
+        cmd[1] += 0.10 * np.sin(0.5 * np.pi * self.distance )* np.sin(0.25 * np. pi * np.sin(2.0 * np.pi * self.distance ))
 
         # overwrite control_cmd if received stop request
         if not self.stop_request:
@@ -644,7 +653,6 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
             plt.pause(0.01)
 
     def update_accel_modifier(self, v, a, accel_cmd):
-
         v_bin = np.digitize(v, self.v_bins) - 1
         a_bin = np.digitize(a, self.a_bins) - 1
         accel_cmd_bin = np.digitize(accel_cmd, self.a_bins) - 1
@@ -652,16 +660,46 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
         if 0 <= v_bin < self.num_bins_v and 0 <= accel_cmd_bin < self.num_bins_a:
             self.accel_modifier_count[v_bin, accel_cmd_bin] += 1
             N = self.accel_modifier_count[v_bin, accel_cmd_bin]
-            self.accel_modifier[v_bin, accel_cmd_bin] += ((N-1) * self.accel_modifier[v_bin, accel_cmd_bin] +  a )/ N
+            self.accel_modifier[v_bin, accel_cmd_bin] = (
+                (N - 1) * self.accel_modifier[v_bin, accel_cmd_bin] + a
+            ) / N
+            # self.get_logger().info(str(abs(self.accel_modifier[v_bin, accel_cmd_bin] - a)))
+
+            num = 20
+            alpha = 0.1
+            interpolate_index = np.where(self.accel_modifier_count[v_bin,:] >= num)[0]
+            #self.get_logger().info(str(self.accel_modifier_count[v_bin,:]))
+            #self.get_logger().info(str(interpolate_index))
+
+            if len(interpolate_index) > 0:
+
+                x = self.a_bins[interpolate_index]
+                x = np.insert(x,0,self.a_bins[0])
+                x = np.append(x,self.a_bins[-1])
+
+                y = self.accel_modifier[v_bin][interpolate_index]
+                y = np.insert(y, 0, self.a_bins[0])
+                y = np.append(y, self.a_bins[-1])
+
+                # self.get_logger().info("x : " + str(x))
+                # self.get_logger().info("y : " + str(y))
+
+                f_linear = interp1d(x, y, kind='linear')
+
+                self.accel_modifier_interpolated[v_bin] = alpha * f_linear(self.a_bins_center) + (1-alpha) * self.accel_modifier[v_bin]
 
     def return_accel_modifier(self, v, accel_cmd):
         v_bin = np.digitize(v, self.v_bins) - 1
         accel_cmd_bin = np.digitize(accel_cmd, self.a_bins) - 1
 
-        if 0 <= v_bin < self.num_bins_v and 0 <= accel_cmd_bin < self.num_bins_a:# and accel_cmd > 0.0:
-            return self.accel_modifier[v_bin, accel_cmd_bin]
+        if (
+            0 <= v_bin < self.num_bins_v and 0 <= accel_cmd_bin < self.num_bins_a
+        ):  # and accel_cmd> 0.0:
+            index = np.argmin((self.accel_modifier_interpolated[v_bin,:] - accel_cmd) ** 2)
+            
+            return self.accel_modifier_interpolated[v_bin,accel_cmd_bin] 
         else:
-            return accel_cmd_bin
+            return accel_cmd
 
 
 def main(args=None):
