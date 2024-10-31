@@ -1,12 +1,12 @@
 /**:
   ros__parameters:
-    LOAD_ROSBAG2_FILES: false
+    LOAD_ROSBAG2_FILES: true
 
-    COURSE_NAME: eight_course
+    # COURSE_NAME: eight_course
     # COURSE_NAME: u_shaped_return
-    # COURSE_NAME: straight_line_positive
+    # OURSE_NAME: straight_line_positive
     # COURSE_NAME: straight_line_negative
-    # COURSE_NAME: reversal_loop_circle
+    COURSE_NAME: reversal_loop_circle
 
     NUM_BINS_V: 10
     NUM_BINS_STEER: 20
@@ -20,8 +20,8 @@
 
     COLLECTING_DATA_V_MIN: 0.5
     COLLECTING_DATA_V_MAX: 7.5
-    COLLECTING_DATA_A_MIN: 0.15
-    COLLECTING_DATA_A_MAX: 0.15
+    COLLECTING_DATA_A_MIN: -1.0
+    COLLECTING_DATA_A_MAX: 1.0
 
     max_lateral_accel: 2.25
     lateral_error_threshold: 2.00

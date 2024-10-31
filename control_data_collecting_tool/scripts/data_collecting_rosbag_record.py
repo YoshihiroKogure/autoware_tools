@@ -38,9 +38,11 @@ class MessageWriter:
         self.node = node
         self.message_writer = None
         self.message_subscriptions_ = []
+        self.is_bag_open = False
 
     def create_writer(self):
         self.message_writer = SequentialWriter()
+        self.is_bag_open = False
 
     def subscribe_topics(self):
         topic_type_list = []
@@ -57,7 +59,7 @@ class MessageWriter:
         # If some topics are not found, log a message and skip the subscription
         if len(unsubscribed_topic) > 0:
             self.node.get_logger().info(f"Failed to get type for topic: {unsubscribed_topic}")
-            return
+            return False
 
         # Generate a unique directory and filename based on the current time for the rosbag file
         now = datetime.now()
@@ -71,9 +73,11 @@ class MessageWriter:
         # Open the rosbag for writing
         try:
             self.message_writer.open(storage_options, converter_options)
+            self.is_bag_open = True
+            self.node.get_logger().info("Bag opened successfully.")
         except Exception as e:
             self.node.get_logger().error(f"Failed to open bag: {e}")
-            return
+            return False
 
         # Create topics in the rosbag for recording
         for topic_name, topic_type in zip(self.topics, topic_type_list):
@@ -82,6 +86,8 @@ class MessageWriter:
                 name=topic_name, type=topic_type, serialization_format="cdr"
             )
             self.message_writer.create_topic(topic_metadata)
+
+        return True
 
     def get_topic_type(self, topic_name):
         # Get the list of topics and their types from the ROS node
@@ -92,6 +98,10 @@ class MessageWriter:
         return None
 
     def start_record(self):
+        if not self.is_bag_open:
+            self.node.get_logger().error("Bag is not open. Make sure to call open() before writing.")
+            return
+
         # Subscribe to the topics and start recording messages
         for topic_name in self.topics:
             topic_type = self.get_topic_type(topic_name)
@@ -117,6 +127,7 @@ class MessageWriter:
         for subscription_ in self.message_subscriptions_:
             self.node.destroy_subscription(subscription_)
         del self.message_writer
+        self.is_bag_open = False
         self.node.get_logger().info("stop recording rosbag")
 
 
@@ -150,7 +161,7 @@ class DataCollectingRosbagRecord(Node):
 
         self.operation_mode_subscription_
 
-        self.timer_period_callback = 1.0
+        self.timer_period_callback = 5.0
         self.timer_callback = self.create_timer(
             self.timer_period_callback,
             self.record_message,
@@ -166,8 +177,8 @@ class DataCollectingRosbagRecord(Node):
         # Start subscribing to topics and recording if the operation mode is 3(LOCAL) and control mode is 1(AUTONOMOUS)
         if self.present_operation_mode_ == 3 and self._present_control_mode_ == 1 and not self.subscribed and not self.recording:
             self.writer.create_writer()
-            self.writer.subscribe_topics()
-            self.subscribed = True
+            self.subscribed = self.writer.subscribe_topics()
+            #self.subscribed = True
 
         # Start recording if topics are subscribed and the operation mode is 3(LOCAL)
         if self.present_operation_mode_ == 3 and self._present_control_mode_ == 1 and self.subscribed and not self.recording:

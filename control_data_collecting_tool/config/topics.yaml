@@ -2,9 +2,14 @@ topics:
   - /localization/kinematic_state
   - /localization/acceleration
   - /vehicle/status/steering_status
-  - /sensing/imu/imu_data
   - /system/operation_mode/state
-  - /vehicle/status/control_mode
+  - /control/trajectory_follower/lane_departure_checker_node/debug/deviation/lateral
+  - /vehicle/raw_vehicle_cmd_converter/debug/compensated_control_cmd
+  - /control/command/control_cmd
+  - /control/trajectory_follower/control_cmd
   - /external/selected/control_cmd
-  - /external/selected/gear_cmd
-  - /data_collecting_trajectory
+  - /control/command/actuation_cmd
+  - /pacmod/accel_aux_rpt
+  - /pacmod/accel_rpt
+  - /pacmod/brake_aux_rpt
+  - /pacmod/brake_rpt
