@@ -161,7 +161,7 @@ class DataCollectingRosbagRecord(Node):
 
         self.operation_mode_subscription_
 
-        self.timer_period_callback = 5.0
+        self.timer_period_callback = 1.0
         self.timer_callback = self.create_timer(
             self.timer_period_callback,
             self.record_message,
