@@ -43,8 +43,8 @@ OUTER_CIRCLE_RADIUS = CIRCLE_RADIUS + 5
 dead_band_delta_acc = 0.01
 dead_band_delat_vel = dead_band_delta_acc * 0.03
 
-delta_vel_gain = 0.5
-delta_acc_gain = 20.0
+delta_vel_gain = 0.5 / 4
+delta_acc_gain = 20.0 / 4
 
 debug_matplotlib_plot_flag = False
 Differential_Smoothing_Flag = True

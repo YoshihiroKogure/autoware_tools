@@ -4,7 +4,7 @@
 
     # COURSE_NAME: eight_course
     # COURSE_NAME: u_shaped_return
-    # OURSE_NAME: straight_line_positive
+    # COURSE_NAME: straight_line_positive
     # COURSE_NAME: straight_line_negative
     COURSE_NAME: reversal_loop_circle
 
@@ -43,7 +43,7 @@
     linearized_pure_pursuit_steer_kd_param: 2.0
     stop_acc: -2.0
     stop_jerk_lim: 5.0
-    lon_acc_lim: 1.5
+    lon_acc_lim: 2.0
     lon_jerk_lim: 0.5
     steer_lim: 0.6
     steer_rate_lim: 0.6
