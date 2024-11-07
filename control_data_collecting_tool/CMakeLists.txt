@@ -12,6 +12,13 @@ install(PROGRAMS
   scripts/data_collecting_data_counter.py
   scripts/data_collecting_base_node.py
   scripts/rosbag_play.py
+  scripts/params.py
+  scripts/courses/base_course.py
+  scripts/courses/load_course.py
+  scripts/courses/straight_line_positive.py
+  scripts/courses/straight_line_negative.py
+  scripts/courses/figure_eight.py
+  scripts/courses/u_shaped.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
