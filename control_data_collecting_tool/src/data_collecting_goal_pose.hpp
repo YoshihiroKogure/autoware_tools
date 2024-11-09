@@ -17,20 +17,49 @@
 
 #include <rviz_common/tool.hpp>
 #include <rviz_default_plugins/tools/goal_pose/goal_tool.hpp>
+#include "rviz_common/properties/string_property.hpp"
+#include "rviz_common/properties/qos_profile_property.hpp"
 
+#include <autoware_adapi_v1_msgs/msg/operation_mode_state.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 
 namespace rviz_plugins
 {
+// DataCollectingGoalPose class that extends GoalTool to add data collection features
 class DataCollectingGoalPose : public rviz_default_plugins::tools::GoalTool
 {
   Q_OBJECT
 public:
+  // Constructor
   DataCollectingGoalPose();
+  // Destructor
   ~DataCollectingGoalPose();
 
+  // Called during tool initialization in RViz
   void onInitialize() override;
 
-  double x;
+  // Sets the pose using specified coordinates and orientation
+  void onPoseSet(double x, double y, double theta) override;
+
+private:
+  // Flag to indicate if control is being applied
+  bool control_applying_ = false;
+
+  // Subscription to listen for operation mode state messages
+  rclcpp::Subscription<autoware_adapi_v1_msgs::msg::OperationModeState>::SharedPtr
+      sub_operation_mode_state_;
+
+  // Callback function to handle received operation mode state messages
+  void onOperationModeState(
+    const autoware_adapi_v1_msgs::msg::OperationModeState::ConstSharedPtr msg);
+
+  // Custom QoS profile for message publishing
+  rclcpp::QoS custom_qos_profile_;
+  // Shared pointer to the raw ROS 2 node used for publishing
+  rclcpp::Node::SharedPtr raw_node_;
+  // Publisher to send PoseStamped messages to a specific topic
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_publisher_;
+
 };
 }  // namespace rviz_plugins
 
