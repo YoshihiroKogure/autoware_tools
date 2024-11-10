@@ -15,8 +15,10 @@
 # limitations under the License.
 
 import numpy as np
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
+import lanelet2
 from lanelet2.io import load, Origin
 from lanelet2.projection import UtmProjector
 from lanelet2.routing import RoutingGraph
@@ -24,7 +26,7 @@ from lanelet2.core import BoundingBox2d, BasicPoint2d
 
 class LaneletUtils:
     @staticmethod
-    def search_nearest_lanelet(point2d, handler, search_radius=50.0):
+    def search_nearest_lanelet(point2d, handler, search_radius=100.0):
         # Set a search radius to create a bounding box around the point
         radius = BasicPoint2d(search_radius, search_radius)
         bb = BoundingBox2d(point2d - radius, point2d + radius)
@@ -88,7 +90,7 @@ class LaneletMapHandler:
     def __init__(self, map_path):
         # Initialize the map projector and load the lanelet map
         self.projector = UtmProjector(Origin(35.0, 139.0))
-        self.lanelet_map = load(map_path, self.projector)
+        self.lanelet_map = load(map_path, Origin(35.0, 139.0))
         
         # Initialize traffic rules and routing graph
         self.traffic_rules = lanelet2.traffic_rules.create(
@@ -100,7 +102,12 @@ class LaneletMapHandler:
         # Store the segmented shortest route
         self.shortest_segmented_route = []
 
+        self.x = []
+        self.y = []
+
     def get_shortest_path(self, ego_point, goal_point):
+        ego_point = np.array([43990.0, 81370.0])
+        goal_point = ego_point
         # Find the nearest lanelet and index to start and goal points
         ego_lanelet, idx_ego_lanelet = self.find_nearest_lanelet_with_index(ego_point)
         goal_lanelet, idx_goal_lanelet = self.find_nearest_lanelet_with_index(goal_point)
@@ -116,7 +123,13 @@ class LaneletMapHandler:
         
         # Segment the path and store the result
         self.shortest_segmented_route = self.segment_path(shortest_path, idx_ego_lanelet, idx_goal_lanelet)
-        return self.shortest_segmented_route
+
+        # Store the x and y coordinates
+        for segment in self.shortest_segmented_route:
+            self.x += [point[0] for point in segment]
+            self.y += [point[1] for point in segment]
+
+        return self.x, self.y
 
     def segment_path(self, shortest_path, start_idx, end_idx):
         # Segment the shortest path based on start and goal indexes

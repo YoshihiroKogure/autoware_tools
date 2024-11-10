@@ -32,7 +32,7 @@ class U_Shaped(Base_Course):
 
     def get_trajectory_points(self,
         long_side_length: float, short_side_length: float
-    ):
+    , ego_point = np.array([0.0,0.0]), goal_point  = np.array([0.0,0.0])):
         a = short_side_length
         b = long_side_length
 

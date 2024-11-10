@@ -29,7 +29,7 @@ class Straight_Line_Negative(Base_Course):
         self.on_line_vel_flag = False
 
 
-    def get_trajectory_points(self, long_side_length: float, short_side_length: float):
+    def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point = np.array([0.0,0.0]), goal_point  = np.array([0.0,0.0])):
 
         total_distance = long_side_length
         t_array = np.arange(start=0.0, stop=total_distance, step=self.step).astype("float")

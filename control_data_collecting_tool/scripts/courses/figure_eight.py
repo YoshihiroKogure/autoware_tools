@@ -30,7 +30,7 @@ class Figure_Eight(Base_Course):
         self.prev_part = "left_circle"
         self.deceleration_rate = 0.70
 
-    def get_trajectory_points(self, long_side_length: float, short_side_length: float):
+    def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point = np.array([0.0,0.0]), goal_point  = np.array([0.0,0.0])):
 
         a = short_side_length
         b = long_side_length

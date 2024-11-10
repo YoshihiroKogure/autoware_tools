@@ -20,6 +20,7 @@ from courses.load_course import load_course
 from data_collecting_base_node import DataCollectingBaseNode
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import PolygonStamped
+from geometry_msgs.msg import PoseStamped
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import cos
@@ -192,6 +193,16 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         )
         self.sub_data_collecting_area_
 
+        self.ego_point = np.array([0.0, 0.0])
+        self.goal_point = np.array([0.0, 0.0])
+        self.sub_data_collecting_gaol_pose_ = self.create_subscription(
+            PoseStamped,
+            "/data_collecting_goal_pose",
+            self.onGoalPose,
+            1,
+        )
+        self.sub_data_collecting_area_
+
         # obtain ros params as dictionary
         param_names = self._parameters
         params = self.get_parameters(param_names)
@@ -246,6 +257,14 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         )
         self.collected_data_counts_of_vel_steer_subscription_
 
+        self.collected_data_counts_of_vel_steer_subscription_ = self.create_subscription(
+            Int32MultiArray,
+            "/control_data_collecting_tools/collected_data_counts_of_vel_steer",
+            self.subscribe_collected_data_counts_of_vel_steer,
+            10,
+        )
+        self.collected_data_counts_of_vel_steer_subscription_
+
     def subscribe_collected_data_counts_of_vel_acc(self, msg):
         rows = msg.layout.dim[0].size
         cols = msg.layout.dim[1].size
@@ -260,7 +279,14 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         self._data_collecting_area_polygon = msg
         self.updateNominalTargetTrajectory()
 
+    def onGoalPose(self, msg):
+        self.goal_point[0] = msg.pose.position.x
+        self.goal_point[1] = msg.pose.position.y
+        #self.updateNominalTargetTrajectory()
+
     def updateNominalTargetTrajectory(self):
+        
+        self.get_logger().info(" ego and goal point : " + str(self.ego_point) + " " + str(self.goal_point))
         data_collecting_area = np.array(
             [
                 np.array(
@@ -332,7 +358,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 trajectory_curvature_data,
                 self.trajectory_parts,
                 self.trajectory_achievement_rates,
-            ) = self.course.get_trajectory_points(actual_long_side, actual_short_side)
+            ) = self.course.get_trajectory_points(actual_long_side, actual_short_side, self.ego_point, self.goal_point)
 
         else:
             self.trajectory_position_data = None
@@ -340,6 +366,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             self.trajectory_longitudinal_velocity_data = None
             self.trajectory_curvature_data = None
 
+        self.get_logger().info(" trajectory_position_data : " + str(trajectory_position_data[0]))
         for i in range(len(trajectory_yaw_data)):
             if trajectory_yaw_data[i] > np.pi:
                 trajectory_yaw_data[i] -= 2 * np.pi
@@ -353,7 +380,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 [np.sin(yaw_offset), np.cos(yaw_offset)],
             ]
         )
-        trajectory_position_data = (rot_matrix @ trajectory_position_data.T).T
+        '''trajectory_position_data = (rot_matrix @ trajectory_position_data.T).T
         trajectory_position_data += rectangle_center_position
         trajectory_yaw_data += yaw_offset
 
@@ -415,7 +442,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 )
                 trajectory_curvature_data = (
                     1 * np.convolve(augmented_curvature_data, w, mode="same")[window:-window]
-                )
+                )'''
         # [2-4] nominal velocity
         target_longitudinal_velocity = (
             self.get_parameter("target_longitudinal_velocity").get_parameter_value().double_value
@@ -497,6 +524,8 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     self._present_kinematic_state.pose.pose.position.z,
                 ]
             )
+            self.ego_point = present_position[:2]
+
             present_orientation = np.array(
                 [
                     self._present_kinematic_state.pose.pose.orientation.x,
@@ -594,7 +623,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 nearestIndex, present_vel, present_acc, self.collected_data_counts_of_vel_acc
             )
 
-            self.get_logger().info("target_vel: {}".format(target_vel))
+            #self.get_logger().info("target_vel: {}".format(target_vel))
 
             trajectory_longitudinal_velocity_data = np.array(
                 [target_vel for _ in range(len(trajectory_longitudinal_velocity_data))]

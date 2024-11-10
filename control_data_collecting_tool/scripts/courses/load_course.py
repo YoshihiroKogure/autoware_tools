@@ -18,6 +18,7 @@ from courses.figure_eight import Figure_Eight
 from courses.straight_line_positive import Straight_Line_Positive
 from courses.straight_line_negative import Straight_Line_Negative
 from courses.u_shaped import U_Shaped
+from courses.along_road import Along_Road
 
 def load_course(course_name, step_size, params_dict):
 
@@ -29,5 +30,7 @@ def load_course(course_name, step_size, params_dict):
         course = Straight_Line_Negative(step_size, params_dict)
     elif course_name == "u_shaped_return":
         course = U_Shaped(step_size, params_dict)
+    elif course_name == "along_road":
+        course = Along_Road(step_size, params_dict)
 
     return course

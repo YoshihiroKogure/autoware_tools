@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+
+# Copyright 2024 Proxima Technology Inc, TIER IV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import numpy as np
+from courses.base_course import Base_Course
+
+from courses.lanelet import LaneletMapHandler
+
+class Along_Road(Base_Course):
+
+    def __init__(self, step: float, param_dict):
+        super().__init__(step, param_dict)
+        
+        map_path = "/home/kogure/autoware_map/BS_map/lanelet2_map.osm"
+        self.handler = LaneletMapHandler(map_path)
+
+    def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point, goal_point):
+        
+        x, y= self.handler.get_shortest_path(ego_point, goal_point)
+        
+        window_size = 100
+        x = np.concatenate([x[0] * np.ones(window_size//2), x, x[-1] * np.ones(window_size//2)])
+        y = np.concatenate([y[0] * np.ones(window_size//2), y, y[-1] * np.ones(window_size//2)])
+
+        x_smoothed = np.convolve(x, np.ones(window_size)/window_size, mode='valid')[window_size//2:-window_size//2]
+        y_smoothed = np.convolve(y, np.ones(window_size)/window_size, mode='valid')[window_size//2:-window_size//2]
+        self.trajectory_points = np.array([x_smoothed, y_smoothed]).T
+        self.parts = ["part" for _ in range(len(x_smoothed))]
+        self.achievement_rates = np.linspace(0.0, 1.0,  len(x_smoothed))
+
+        dx = (x_smoothed[1:] - x_smoothed[:-1]) / self.step
+        dy = (y_smoothed[1:] - y_smoothed[:-1]) / self.step
+
+        ddx = (dx[1:] - dx[:-1]) / self.step
+        ddy = (dy[1:] - dy[:-1]) / self.step
+
+        self.yaw = np.arctan2(dy, dx)
+        self.yaw = np.array(self.yaw.tolist() + [self.yaw[-1]])
+
+        self.curvature = 1e-9 + abs(ddx * dy[:-1] - ddy * dx[:-1]) / (dx[:-1] ** 2 + dy[:-1] ** 2 + 1e-9) ** 1.5
+        self.curvature = np.array(self.curvature.tolist() + [self.curvature[-2], self.curvature[-1]])
+
+        self.handler.plot_map()
+
+        return self.trajectory_points, self.yaw, self.curvature, self.parts, self.achievement_rates
+
+    def get_target_velocity(self, nearestIndex, current_vel, current_acc, collected_data_counts_of_vel_acc):
+
+        return 4.0

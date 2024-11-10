@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from params import Params
+import numpy as np
 
 class Base_Course:
 
@@ -30,7 +31,7 @@ class Base_Course:
         self.params = Params(param_dict)
         
 
-    def get_trajectory_points(self, long_side_length: float, short_side_length: float):
+    def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point = np.array([0.0,0.0]), goal_point  = np.array([0.0,0.0])):
         pass
 
     def update_trajectory_points(self):
