@@ -31,6 +31,7 @@ from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 from scipy.interpolate import interp1d
 
+
 debug_matplotlib_plot_flag = False
 if debug_matplotlib_plot_flag:
     import matplotlib.pyplot as plt
@@ -519,7 +520,7 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
 
         cmd[0] += tmp_acc_noise
         self.distance += 0.033 * 5.0  
-        cmd[1] += 0.10 * np.sin(0.5 * np.pi * self.distance )* np.sin(0.25 * np. pi * np.sin(2.0 * np.pi * self.distance ))
+        cmd[1] += self.get_parameter("steer_noise_amp").get_parameter_value().double_value * np.sin(0.5 * np.pi * self.distance )* np.sin(0.25 * np. pi * np.sin(2.0 * np.pi * self.distance ))
 
         # overwrite control_cmd if received stop request
         if not self.stop_request:
