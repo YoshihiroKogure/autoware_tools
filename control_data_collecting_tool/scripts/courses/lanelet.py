@@ -21,19 +21,20 @@ import matplotlib.pyplot as plt
 import lanelet2
 from lanelet2.io import load, Origin
 from lanelet2.projection import UtmProjector
+from lanelet2_extension_python.projection import MGRSProjector
 from lanelet2.routing import RoutingGraph
 from lanelet2.core import BoundingBox2d, BasicPoint2d
 
 class LaneletUtils:
     @staticmethod
-    def search_nearest_lanelet(point2d, handler, search_radius=100.0):
+    def search_nearest_lanelet(point2d, handler, search_radius=10.0):
         # Set a search radius to create a bounding box around the point
         radius = BasicPoint2d(search_radius, search_radius)
         bb = BoundingBox2d(point2d - radius, point2d + radius)
-        
+
         # Search for lanelets within the bounding box
         lanelets_at_p = handler.lanelet_map.laneletLayer.search(bb)
-        
+
         # Find the nearest lanelet to the specified point
         nearest_lanelet = None
         min_distance = float('inf')
@@ -89,8 +90,10 @@ class LaneletUtils:
 class LaneletMapHandler:
     def __init__(self, map_path):
         # Initialize the map projector and load the lanelet map
-        self.projector = UtmProjector(Origin(35.0, 139.0))
-        self.lanelet_map = load(map_path, Origin(35.0, 139.0))
+        longitude = 139.6503
+        latitude = 35.6762
+        projector = MGRSProjector(Origin(latitude, longitude))
+        self.lanelet_map = load(map_path, projector)
         
         # Initialize traffic rules and routing graph
         self.traffic_rules = lanelet2.traffic_rules.create(
@@ -102,34 +105,41 @@ class LaneletMapHandler:
         # Store the segmented shortest route
         self.shortest_segmented_route = []
 
-        self.x = []
-        self.y = []
-
     def get_shortest_path(self, ego_point, goal_point):
-        ego_point = np.array([43990.0, 81370.0])
-        goal_point = ego_point
+        
+        # ego_point = goal_point
+        # goal_point = goal_point
+
         # Find the nearest lanelet and index to start and goal points
         ego_lanelet, idx_ego_lanelet = self.find_nearest_lanelet_with_index(ego_point)
         goal_lanelet, idx_goal_lanelet = self.find_nearest_lanelet_with_index(goal_point)
+
+        if ego_lanelet is None or goal_lanelet is None:
+            return None, None
     
         # Check if start and goal are in the same lanelet
         if ego_lanelet == goal_lanelet:
             ego_lanelet = self.get_following_lanelet(ego_lanelet)
             if ego_lanelet is None:
-                return None  # Return None if no path can be found
+                return None, None  # Return None if no path can be found
     
         # Get the shortest path between the two lanelets
         shortest_path = self.routing_graph.getRoute(ego_lanelet, goal_lanelet).shortestPath()
+
+        if shortest_path is None:
+            return None, None
         
         # Segment the path and store the result
         self.shortest_segmented_route = self.segment_path(shortest_path, idx_ego_lanelet, idx_goal_lanelet)
-
+        
+        x = []
+        y = []
         # Store the x and y coordinates
         for segment in self.shortest_segmented_route:
-            self.x += [point[0] for point in segment]
-            self.y += [point[1] for point in segment]
+            x += [point[0] for point in segment]
+            y += [point[1] for point in segment]
 
-        return self.x, self.y
+        return np.array(x), np.array(y)
 
     def segment_path(self, shortest_path, start_idx, end_idx):
         # Segment the shortest path based on start and goal indexes
@@ -161,6 +171,9 @@ class LaneletMapHandler:
         # Find the nearest lanelet and the closest segment index
         point_2D = BasicPoint2d(point[0], point[1])
         lanelet = LaneletUtils.search_nearest_lanelet(point_2D, self)
+
+        if lanelet is None:
+            return None, None
         idx = LaneletUtils.closest_segment(lanelet.centerline, point_2D)
         return lanelet, idx
 

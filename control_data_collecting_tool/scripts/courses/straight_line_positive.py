@@ -17,6 +17,9 @@
 import numpy as np
 from courses.base_course import Base_Course
 
+def computeTriangleArea(A, B, C):
+    return 0.5 * abs(np.cross(B - A, C - A))
+
 class Straight_Line_Positive(Base_Course):
 
     def __init__(self, step: float, param_dict):
@@ -172,5 +175,20 @@ class Straight_Line_Positive(Base_Course):
 
         return target_vel
 
+    def get_boundary_points(self):
+        return  np.vstack((self.A, self.B, self.C, self.D))
+    
+    def check_in_boundary(self, current_position):
+        P = current_position[0:2]
 
+        area_ABCD = computeTriangleArea(self.A, self.B, self.C) + computeTriangleArea(self.C, self.D, self.A)
 
+        area_PAB = computeTriangleArea(P, self.A, self.B)
+        area_PBC = computeTriangleArea(P, self.B, self.C)
+        area_PCD = computeTriangleArea(P, self.C, self.D)
+        area_PDA = computeTriangleArea(P, self.D, self.A)
+
+        if area_PAB + area_PBC + area_PCD + area_PDA > area_ABCD * 1.001:
+            return False
+        else:
+            return True
