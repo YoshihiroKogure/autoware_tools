@@ -491,11 +491,10 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             self.vel_noise_list.pop(0)
 
             # [4] find near point index for local trajectory
-            min_index = np.max([self.nearestIndex - len(trajectory_position_data)//4, 0])
-            max_index = np.min([self.nearestIndex + len(trajectory_position_data)//4, len(trajectory_position_data)])
-            distance = np.sqrt(((trajectory_position_data - present_position[:2]) ** 2).sum(axis=1))
+            index_range = np.arange(self.nearestIndex - len(trajectory_position_data) // 4, self.nearestIndex + len(trajectory_position_data) // 4) % len(trajectory_position_data)
+            distance = np.sqrt(((trajectory_position_data[index_range] - present_position[:2]) ** 2).sum(axis=1))
             index_array_near = np.argsort(distance)
-            self.nearestIndex = index_array_near[0]
+            self.nearestIndex = index_range[index_array_near[0]]
             self.one_round_progress_rate = 1.0 * self.nearestIndex / len(trajectory_position_data)
             # set target velocity
             present_vel = present_linear_velocity[0]
@@ -503,6 +502,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             target_vel = self.course.get_target_velocity(
                 self.nearestIndex, present_vel, present_acc, self.collected_data_counts_of_vel_acc
             )
+            # target vel for debugging
             target_vel = 6.0
 
             trajectory_longitudinal_velocity_data = np.array(
@@ -512,12 +512,12 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             # [5] modify target velocity
             # [5-1] add noise
             aug_data_length = len(trajectory_position_data) // 4
-            trajectory_position_data = np.vstack(
+            '''trajectory_position_data = np.vstack(
                 [trajectory_position_data, trajectory_position_data[:aug_data_length]]
-            )
-            trajectory_yaw_data = np.hstack(
+            )'''
+            '''trajectory_yaw_data = np.hstack(
                 [trajectory_yaw_data, trajectory_yaw_data[:aug_data_length]]
-            )
+            )'''
             trajectory_longitudinal_velocity_data = np.hstack(
                 [
                     trajectory_longitudinal_velocity_data,
@@ -594,9 +594,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
             # [6] publish
             # [6-1] publish trajectory
-            pub_traj_len = min(int(50 / self.traj_step), len(trajectory_position_data))
+            pub_traj_index = np.arange(self.nearestIndex, self.nearestIndex + int(50 / self.traj_step)) % (len(trajectory_position_data)//2)
             tmp_traj = Trajectory()
-            for i in range(self.nearestIndex, pub_traj_len):
+            for i in pub_traj_index:
                 tmp_traj_point = TrajectoryPoint()
                 tmp_traj_point.pose.position.x = trajectory_position_data[i, 0]
                 tmp_traj_point.pose.position.y = trajectory_position_data[i, 1]
@@ -673,7 +673,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
             marker_traj2.points = []
             marker_downsampling = 5
-            for i in range((len(trajectory_position_data) // marker_downsampling)):
+            for i in range( len(trajectory_position_data) // marker_downsampling ):
                 tmp_marker_point = Point()
                 tmp_marker_point.x = trajectory_position_data[i * marker_downsampling, 0]
                 tmp_marker_point.y = trajectory_position_data[i * marker_downsampling, 1]
@@ -715,10 +715,10 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             end_marker_point = Point()
             end_marker_point.x = tmp_traj.points[0].pose.position.x + 5.0 * tangent_vec[
                 0
-            ] / np.linalg.norm(tangent_vec)
+            ]
             end_marker_point.y = tmp_traj.points[0].pose.position.y + 5.0 * tangent_vec[
                 1
-            ] / np.linalg.norm(tangent_vec)
+            ]
             end_marker_point.z = 0.0
             marker_arrow.points.append(end_marker_point)
 

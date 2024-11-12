@@ -27,7 +27,7 @@ from lanelet2.core import BoundingBox2d, BasicPoint2d
 
 class LaneletUtils:
     @staticmethod
-    def search_nearest_lanelet(point2d, handler, search_radius=10.0):
+    def search_nearest_lanelet(point2d, handler, search_radius=1.0):
         # Set a search radius to create a bounding box around the point
         radius = BasicPoint2d(search_radius, search_radius)
         bb = BoundingBox2d(point2d - radius, point2d + radius)
@@ -152,11 +152,6 @@ class LaneletMapHandler:
             # Cache centerline for efficiency
             center_line = lanelet_center_cache.setdefault(lanelet.id, self.get_lanelet_centerline(lanelet))
             
-            # Check for lane changes and interpolate if necessary
-            if i < len(shortest_path) - 1:
-                center_line, plus_lane_idx = self.check_lane_change(lanelet, shortest_path[i + 1], center_line)
-                i += plus_lane_idx
-            i += 1
             # Adjust segments based on path position
             if i == 0:
                 segment = center_line[start_idx:]
@@ -165,6 +160,13 @@ class LaneletMapHandler:
             else:
                 segment = center_line
             segmented_route.append(segment)
+
+            # Check for lane changes and interpolate if necessary
+            if i < len(shortest_path) - 1:
+                center_line, plus_lane_idx = self.check_lane_change(lanelet, shortest_path[i + 1], center_line)
+                #i += plus_lane_idx
+            i += 1
+
         return segmented_route
 
     def find_nearest_lanelet_with_index(self, point):

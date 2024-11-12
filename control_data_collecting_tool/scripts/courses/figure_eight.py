@@ -110,19 +110,24 @@ class Figure_Eight(Base_Course):
         # drop rest
         x = x[:i_end]
         y = y[:i_end]
-        window_size = 500
-        x = np.concatenate([x[-window_size//2:], x, x[:window_size//2]])
-        y = np.concatenate([y[-window_size//2:], y, y[:window_size//2]])
+        self.parts = self.parts[:i_end]
+        self.achievement_rates = self.achievement_rates[:i_end]
+
+        x = np.concatenate((x, x))
+        y = np.concatenate((y, y))
+
+        self.parts = np.concatenate((self.parts, self.parts))
+        self.achievement_rates = np.concatenate((self.achievement_rates, self.achievement_rates))
+        window_size = 10
+        x = np.concatenate((x[-window_size//2:], x, x[:window_size//2]))
+        y = np.concatenate((y[-window_size//2:], y, y[:window_size//2]))
 
         x_smoothed = np.convolve(x, np.ones(window_size)/window_size, mode='valid')[window_size//2:-window_size//2]
         y_smoothed = np.convolve(y, np.ones(window_size)/window_size, mode='valid')[window_size//2:-window_size//2]
         self.trajectory_points = 1.0 * np.array([x_smoothed, y_smoothed]).T
-        self.parts = self.parts[:i_end]
-        self.achievement_rates = self.achievement_rates[:i_end]
 
-
-        dx = (x_smoothed[1:] - x_smoothed[:-1]) / self.step
-        dy = (y_smoothed[1:] - y_smoothed[:-1]) / self.step
+        dx = (x[1:] - x[:-1]) / self.step
+        dy = (y[1:] - y[:-1]) / self.step
 
         ddx = (dx[1:] - dx[:-1]) / self.step
         ddy = (dy[1:] - dy[:-1]) / self.step
