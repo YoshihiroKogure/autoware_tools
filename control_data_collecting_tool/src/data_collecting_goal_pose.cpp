@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include "data_collecting_goal_pose.hpp"
+
 #include <rviz_common/display_context.hpp>  // Include for access to DisplayContext
+
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
 namespace rviz_plugins
 {
 // Constructor: Initializes custom QoS profile
-DataCollectingGoalPose::DataCollectingGoalPose() : custom_qos_profile_(rclcpp::QoS(5)) 
+DataCollectingGoalPose::DataCollectingGoalPose() : custom_qos_profile_(rclcpp::QoS(5))
 {
 }
 
@@ -52,9 +53,10 @@ void DataCollectingGoalPose::onInitialize()
     "/data_collecting_goal_pose", custom_qos_profile_);
 
   // Subscription to the operation mode state topic with a QoS of 1
-  sub_operation_mode_state_ = raw_node->create_subscription<autoware_adapi_v1_msgs::msg::OperationModeState>(
-    "/system/operation_mode/state", rclcpp::QoS{1},
-    std::bind(&DataCollectingGoalPose::onOperationModeState, this, std::placeholders::_1));
+  sub_operation_mode_state_ =
+    raw_node->create_subscription<autoware_adapi_v1_msgs::msg::OperationModeState>(
+      "/system/operation_mode/state", rclcpp::QoS{1},
+      std::bind(&DataCollectingGoalPose::onOperationModeState, this, std::placeholders::_1));
 }
 
 // Override onPoseSet to set pose only when control is not applying
@@ -66,7 +68,7 @@ void DataCollectingGoalPose::onPoseSet(double x, double y, double theta)
   }
 }
 
-} // namespace rviz_plugins
+}  // namespace rviz_plugins
 
 #include <pluginlib/class_list_macros.hpp>
 // Export the plugin class so it can be dynamically loaded by RViz

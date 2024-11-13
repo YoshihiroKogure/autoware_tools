@@ -15,10 +15,11 @@
 #ifndef DATA_COLLECTING_GOAL_POSE_HPP_
 #define DATA_COLLECTING_GOAL_POSE_HPP_
 
+#include "rviz_common/properties/qos_profile_property.hpp"
+#include "rviz_common/properties/string_property.hpp"
+
 #include <rviz_common/tool.hpp>
 #include <rviz_default_plugins/tools/goal_pose/goal_tool.hpp>
-#include "rviz_common/properties/string_property.hpp"
-#include "rviz_common/properties/qos_profile_property.hpp"
 
 #include <autoware_adapi_v1_msgs/msg/operation_mode_state.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -47,7 +48,7 @@ private:
 
   // Subscription to listen for operation mode state messages
   rclcpp::Subscription<autoware_adapi_v1_msgs::msg::OperationModeState>::SharedPtr
-      sub_operation_mode_state_;
+    sub_operation_mode_state_;
 
   // Callback function to handle received operation mode state messages
   void onOperationModeState(
@@ -59,7 +60,6 @@ private:
   rclcpp::Node::SharedPtr raw_node_;
   // Publisher to send PoseStamped messages to a specific topic
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_publisher_;
-
 };
 }  // namespace rviz_plugins
 
