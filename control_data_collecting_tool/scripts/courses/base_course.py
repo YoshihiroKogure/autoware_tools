@@ -14,13 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from params import Params
 import numpy as np
+from params import Params
+
 
 class Base_Course:
-
     def __init__(self, step: float, param_dict):
-
         self.step = step
         self.trajectory_points = None
         self.yaw = None
@@ -31,21 +30,26 @@ class Base_Course:
         self.boundary_points = None
         self.boundary_yaw = None
 
+        self.closed = True
+
         self.A = np.array([0.0, 0.0])
         self.B = np.array([0.0, 0.0])
         self.C = np.array([0.0, 0.0])
         self.D = np.array([0.0, 0.0])
 
         self.params = Params(param_dict)
-        
 
-    def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point = np.array([0.0,0.0]), goal_point  = np.array([0.0,0.0])):
+    def get_trajectory_points(
+        self,
+        long_side_length: float,
+        short_side_length: float,
+        ego_point=np.array([0.0, 0.0]),
+        goal_point=np.array([0.0, 0.0]),
+    ):
         pass
 
-    def update_trajectory_points(self):
-        pass
-
-    def get_target_velocity(self, nearestIndex, current_vel, current_acc):
+    def get_target_velocity(self, nearestIndex, current_time, current_vel, current_acc, collected_data_counts_of_vel_acc
+    ):
         pass
 
     def set_vertices(self, A, B, C, D):
@@ -58,10 +62,9 @@ class Base_Course:
         pass
 
     def check_in_boundary(self, current_position):
-        pass
+        return True
 
     def return_trajectory_points(self, yaw_offset, rectangle_center_position):
-
         rot_matrix = np.array(
             [
                 [np.cos(yaw_offset), -np.sin(yaw_offset)],
@@ -73,5 +76,13 @@ class Base_Course:
         trajectory_position_data += rectangle_center_position
         trajectory_yaw_data = self.yaw + yaw_offset
 
-        return trajectory_position_data, trajectory_yaw_data, self.curvature, self.parts, self.achievement_rates
-    
+        return (
+            trajectory_position_data,
+            trajectory_yaw_data,
+            self.curvature,
+            self.parts,
+            self.achievement_rates,
+        )
+
+    def update_trajectory_points(self, yaw_offset, rectangle_center_position):
+        return self.return_trajectory_points(yaw_offset, rectangle_center_position)

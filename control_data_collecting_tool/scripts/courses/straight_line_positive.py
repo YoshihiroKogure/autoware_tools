@@ -14,26 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 from courses.base_course import Base_Course
+import numpy as np
+
 
 def computeTriangleArea(A, B, C):
     return 0.5 * abs(np.cross(B - A, C - A))
 
-class Straight_Line_Positive(Base_Course):
 
+class Straight_Line_Positive(Base_Course):
     def __init__(self, step: float, param_dict):
         super().__init__(step, param_dict)
-        
+
         self.target_vel_on_line = 0.0
         self.target_acc_on_line = 0.0
         self.vel_idx, self.acc_idx = 0, 0
 
         self.on_line_vel_flag = False
 
-
-    def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point = np.array([0.0,0.0]), goal_point  = np.array([0.0,0.0])):
-
+    def get_trajectory_points(
+        self,
+        long_side_length: float,
+        short_side_length: float,
+        ego_point=np.array([0.0, 0.0]),
+        goal_point=np.array([0.0, 0.0]),
+    ):
         total_distance = long_side_length
         t_array = np.arange(start=0.0, stop=total_distance, step=self.step).astype("float")
 
@@ -45,28 +50,23 @@ class Straight_Line_Positive(Base_Course):
         self.points = np.vstack((x, y)).T
         self.curvature = 1e-9 * np.ones(len(t_array))
         self.achievement_rates = np.linspace(0.0, 1.0, len(t_array))
-        
+
         return self.points, self.yaw, self.curvature, self.parts, self.achievement_rates
 
-
-    def get_target_velocity(self, nearestIndex, current_vel, current_acc, collected_data_counts_of_vel_acc):
-
-        part = self.parts[
-            nearestIndex
-        ]
+    def get_target_velocity(
+        self, nearestIndex, current_time, current_vel, current_acc, collected_data_counts_of_vel_acc
+    ):
+        part = self.parts[nearestIndex]
         achievement_rate = self.achievement_rates[nearestIndex]
 
         acc_kp_of_pure_pursuit = self.params.acc_kp
 
         N_V = self.params.num_bins_v
         N_A = self.params.num_bins_a
-    
 
         max_lateral_accel = self.params.max_lateral_accel
-        max_vel_from_lateral_acc = np.sqrt(
-                max_lateral_accel * self.curvature[nearestIndex]
-            )
-        
+        max_vel_from_lateral_acc = np.sqrt(max_lateral_accel * self.curvature[nearestIndex])
+
         min_data_num_margin = 5
         min_index_list = []
         if part == "linear" and achievement_rate < 0.05:
@@ -85,8 +85,12 @@ class Straight_Line_Positive(Base_Course):
                 (-1 + N_V, -3 + N_A),
             ]
 
-            for i in range(self.params.collecting_data_min_n_v, self.params.collecting_data_max_n_v):
-                for j in range(self.params.collecting_data_min_n_a, self.params.collecting_data_max_n_a):
+            for i in range(
+                self.params.collecting_data_min_n_v, self.params.collecting_data_max_n_v
+            ):
+                for j in range(
+                    self.params.collecting_data_min_n_a, self.params.collecting_data_max_n_a
+                ):
                     if (i, j) not in exclude_idx_list:
                         if (
                             min_num_data - min_data_num_margin
@@ -106,7 +110,6 @@ class Straight_Line_Positive(Base_Course):
             self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
             self.target_vel_on_line = self.params.v_bin_centers[self.vel_idx]
 
-
         if self.target_vel_on_line > self.params.v_max * 3.0 / 4.0:
             self.deceleration_rate = 0.55 + 0.10
         elif self.target_vel_on_line > self.params.v_max / 2.0:
@@ -114,18 +117,17 @@ class Straight_Line_Positive(Base_Course):
         else:
             self.deceleration_rate = 0.85 + 0.10
 
-
         if (
-                current_vel > self.target_vel_on_line - self.params.v_max / N_V / 8.0
-                and self.target_vel_on_line >= self.params.v_max / 2.0
-            ):
-                self.on_line_vel_flag = False
+            current_vel > self.target_vel_on_line - self.params.v_max / N_V / 8.0
+            and self.target_vel_on_line >= self.params.v_max / 2.0
+        ):
+            self.on_line_vel_flag = False
 
         elif (
             abs(current_vel - self.target_vel_on_line) < self.params.v_max / N_V / 4.0
             and self.target_vel_on_line < self.params.v_max / 2.0
         ):
-                self.on_line_vel_flag = False
+            self.on_line_vel_flag = False
 
         # accelerate until vehicle reaches target_vel_on_line
         if 0.0 <= achievement_rate and achievement_rate < 0.45 and self.on_line_vel_flag:
@@ -139,9 +141,9 @@ class Straight_Line_Positive(Base_Course):
 
         # collect target_acceleration data when current velocity is close to target_vel_on_line
         elif (
-                achievement_rate < self.deceleration_rate
-                or self.target_vel_on_line < self.params.v_max / 2.0
-            ):
+            achievement_rate < self.deceleration_rate
+            or self.target_vel_on_line < self.params.v_max / 2.0
+        ):
             if collected_data_counts_of_vel_acc[self.vel_idx, self.acc_idx] > 50:
                 self.acc_idx = np.argmin(collected_data_counts_of_vel_acc[self.vel_idx, :])
                 self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
@@ -149,7 +151,10 @@ class Straight_Line_Positive(Base_Course):
             if (
                 current_vel
                 < max(
-                    [self.target_vel_on_line - 1.5 * self.params.v_max / N_V, self.params.v_max / N_V / 2.0]
+                    [
+                        self.target_vel_on_line - 1.5 * self.params.v_max / N_V,
+                        self.params.v_max / N_V / 2.0,
+                    ]
                 )
                 and self.target_acc_on_line < 0.0
             ):
@@ -168,7 +173,7 @@ class Straight_Line_Positive(Base_Course):
                 self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
 
             target_vel = current_vel + self.target_acc_on_line / acc_kp_of_pure_pursuit
-                
+
         # deceleration
         if self.deceleration_rate <= achievement_rate:
             target_vel = 0.0
@@ -176,12 +181,14 @@ class Straight_Line_Positive(Base_Course):
         return target_vel
 
     def get_boundary_points(self):
-        return  np.vstack((self.A, self.B, self.C, self.D))
-    
+        return np.vstack((self.A, self.B, self.C, self.D))
+
     def check_in_boundary(self, current_position):
         P = current_position[0:2]
 
-        area_ABCD = computeTriangleArea(self.A, self.B, self.C) + computeTriangleArea(self.C, self.D, self.A)
+        area_ABCD = computeTriangleArea(self.A, self.B, self.C) + computeTriangleArea(
+            self.C, self.D, self.A
+        )
 
         area_PAB = computeTriangleArea(P, self.A, self.B)
         area_PBC = computeTriangleArea(P, self.B, self.C)

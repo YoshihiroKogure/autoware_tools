@@ -14,14 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from courses.figure_eight import Figure_Eight
-from courses.straight_line_positive import Straight_Line_Positive
-from courses.straight_line_negative import Straight_Line_Negative
-from courses.u_shaped import U_Shaped
+
 from courses.along_road import Along_Road
+from courses.figure_eight import Figure_Eight
+from courses.reversal_loop_circle import Reversal_Loop_Circle
+from courses.straight_line_negative import Straight_Line_Negative
+from courses.straight_line_positive import Straight_Line_Positive
+from courses.u_shaped import U_Shaped
+
 
 def load_course(course_name, step_size, params_dict):
-
     if course_name == "eight_course":
         course = Figure_Eight(step_size, params_dict)
     elif course_name == "straight_line_positive":
@@ -30,6 +32,8 @@ def load_course(course_name, step_size, params_dict):
         course = Straight_Line_Negative(step_size, params_dict)
     elif course_name == "u_shaped_return":
         course = U_Shaped(step_size, params_dict)
+    elif course_name == "reversal_loop_circle":
+        course = Reversal_Loop_Circle(step_size, params_dict)
     elif course_name == "along_road":
         course = Along_Road(step_size, params_dict)
 

@@ -14,16 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import lanelet2
+from lanelet2.core import BasicPoint2d
+from lanelet2.core import BoundingBox2d
+from lanelet2.io import Origin
+from lanelet2.io import load
+from lanelet2.projection import UtmProjector
+from lanelet2.routing import RoutingGraph
+from lanelet2_extension_python.projection import MGRSProjector
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
 
-import lanelet2
-from lanelet2.io import load, Origin
-from lanelet2.projection import UtmProjector
-from lanelet2_extension_python.projection import MGRSProjector
-from lanelet2.routing import RoutingGraph
-from lanelet2.core import BoundingBox2d, BasicPoint2d
 
 class LaneletUtils:
     @staticmethod
@@ -37,20 +39,20 @@ class LaneletUtils:
 
         # Find the nearest lanelet to the specified point
         nearest_lanelet = None
-        min_distance = float('inf')
+        min_distance = float("inf")
         for lanelet_at_p in lanelets_at_p:
             center_point = lanelet_at_p.centerline[0]  # Use first point on centerline as reference
             distance = np.linalg.norm([point2d.x - center_point.x, point2d.y - center_point.y])
             if distance < min_distance:
                 min_distance = distance
                 nearest_lanelet = handler.lanelet_map.laneletLayer[lanelet_at_p.id]
-        
+
         return nearest_lanelet
 
     @staticmethod
     def closest_segment(lineString, pointToProject2d):
         # Find the closest segment in the lineString to the specified point
-        min_dist = float('inf')
+        min_dist = float("inf")
         min_idx = None
         for idx in range(len(lineString) - 1):
             point = lineString[idx]
@@ -74,16 +76,22 @@ class LaneletUtils:
         # Create interpolation parameters based on the length of each line
         t_one = np.linspace(0.0, 1.0, len(oneLine))
         t_another = np.linspace(0.0, 1.0, len(anotherLine))
-        
+
         # Set up linear interpolation functions for both lines
-        linear_interp_one = interp1d(t_one, oneLine, axis=0, kind='linear', fill_value="extrapolate")
-        linear_interp_another = interp1d(t_another, anotherLine, axis=0, kind='linear', fill_value="extrapolate")
-        
+        linear_interp_one = interp1d(
+            t_one, oneLine, axis=0, kind="linear", fill_value="extrapolate"
+        )
+        linear_interp_another = interp1d(
+            t_another, anotherLine, axis=0, kind="linear", fill_value="extrapolate"
+        )
+
         # Define a common interpolation parameter
         t_interp = np.linspace(0.0, 1.0, max(len(oneLine), len(anotherLine)))
-        
+
         # Perform interpolation between the two lines
-        interpolated_points = (1.0 - t_interp[:, np.newaxis]) * linear_interp_one(t_interp) + t_interp[:, np.newaxis] * linear_interp_another(t_interp)
+        interpolated_points = (1.0 - t_interp[:, np.newaxis]) * linear_interp_one(
+            t_interp
+        ) + t_interp[:, np.newaxis] * linear_interp_another(t_interp)
         return interpolated_points
 
 
@@ -94,19 +102,18 @@ class LaneletMapHandler:
         latitude = 35.6762
         projector = MGRSProjector(Origin(latitude, longitude))
         self.lanelet_map = load(map_path, projector)
-        
+
         # Initialize traffic rules and routing graph
         self.traffic_rules = lanelet2.traffic_rules.create(
             lanelet2.traffic_rules.Locations.Germany,
             lanelet2.traffic_rules.Participants.Vehicle,
         )
         self.routing_graph = RoutingGraph(self.lanelet_map, self.traffic_rules)
-        
+
         # Store the segmented shortest route
         self.shortest_segmented_route = []
 
     def get_shortest_path(self, ego_point, goal_point):
-        
         # ego_point = goal_point
         # goal_point = goal_point
 
@@ -116,22 +123,24 @@ class LaneletMapHandler:
 
         if ego_lanelet is None or goal_lanelet is None:
             return None, None
-    
+
         # Check if start and goal are in the same lanelet
         if ego_lanelet == goal_lanelet:
             ego_lanelet = self.get_following_lanelet(ego_lanelet)
             if ego_lanelet is None:
                 return None, None  # Return None if no path can be found
-    
+
         # Get the shortest path between the two lanelets
         shortest_path = self.routing_graph.getRoute(ego_lanelet, goal_lanelet).shortestPath()
 
         if shortest_path is None:
             return None, None
-        
+
         # Segment the path and store the result
-        self.shortest_segmented_route = self.segment_path(shortest_path, idx_ego_lanelet, idx_goal_lanelet)
-        
+        self.shortest_segmented_route = self.segment_path(
+            shortest_path, idx_ego_lanelet, idx_goal_lanelet
+        )
+
         x = []
         y = []
         # Store the x and y coordinates
@@ -150,8 +159,10 @@ class LaneletMapHandler:
         while i < len(shortest_path):
             lanelet = shortest_path[i]
             # Cache centerline for efficiency
-            center_line = lanelet_center_cache.setdefault(lanelet.id, self.get_lanelet_centerline(lanelet))
-            
+            center_line = lanelet_center_cache.setdefault(
+                lanelet.id, self.get_lanelet_centerline(lanelet)
+            )
+
             # Adjust segments based on path position
             if i == 0:
                 segment = center_line[start_idx:]
@@ -163,8 +174,10 @@ class LaneletMapHandler:
 
             # Check for lane changes and interpolate if necessary
             if i < len(shortest_path) - 1:
-                center_line, plus_lane_idx = self.check_lane_change(lanelet, shortest_path[i + 1], center_line)
-                #i += plus_lane_idx
+                center_line, plus_lane_idx = self.check_lane_change(
+                    lanelet, shortest_path[i + 1], center_line
+                )
+                # i += plus_lane_idx
             i += 1
 
         return segmented_route
@@ -190,9 +203,13 @@ class LaneletMapHandler:
 
     def check_lane_change(self, current_lanelet, next_lanelet, center_line):
         # Check if a lane change to the next lanelet is possible
-        for adjacent in self.routing_graph.rightRelations(current_lanelet) + self.routing_graph.leftRelations(current_lanelet):
+        for adjacent in self.routing_graph.rightRelations(
+            current_lanelet
+        ) + self.routing_graph.leftRelations(current_lanelet):
             if adjacent.lanelet == next_lanelet:
-                interpolated_line = LaneletUtils.interpolate_two_lines(center_line, self.get_lanelet_centerline(next_lanelet))
+                interpolated_line = LaneletUtils.interpolate_two_lines(
+                    center_line, self.get_lanelet_centerline(next_lanelet)
+                )
                 return interpolated_line, 1
         return center_line, 0
 
@@ -207,9 +224,14 @@ class LaneletMapHandler:
         for lanelet in self.lanelet_map.laneletLayer:
             plt.plot([p.x for p in lanelet.leftBound], [p.y for p in lanelet.leftBound], "-g")
             plt.plot([p.x for p in lanelet.rightBound], [p.y for p in lanelet.rightBound], "-g")
-        
+
         # Plot the centerlines of the shortest segmented route
         for center_line in self.shortest_segmented_route:
-            plt.plot([point[0] for point in center_line], [point[1] for point in center_line], linestyle='--', linewidth=2)
-        
+            plt.plot(
+                [point[0] for point in center_line],
+                [point[1] for point in center_line],
+                linestyle="--",
+                linewidth=2,
+            )
+
         plt.show()

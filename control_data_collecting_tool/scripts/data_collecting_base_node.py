@@ -88,7 +88,6 @@ class DataCollectingBaseNode(Node):
             ParameterDescriptor(description="Wheel base [m]"),
         )
 
-
         self.ego_point = np.array([0.0, 0.0])
         self.goal_point = np.array([0.0, 0.0])
 
@@ -164,7 +163,12 @@ class DataCollectingBaseNode(Node):
 
     def onOdometry(self, msg):
         self._present_kinematic_state = msg
-        self.ego_point = np.array([self._present_kinematic_state.pose.pose.position.x, self._present_kinematic_state.pose.pose.position.y])
+        self.ego_point = np.array(
+            [
+                self._present_kinematic_state.pose.pose.position.x,
+                self._present_kinematic_state.pose.pose.position.y,
+            ]
+        )
 
     def onAcceleration(self, msg):
         self._present_acceleration = msg
