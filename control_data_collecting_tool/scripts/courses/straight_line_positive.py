@@ -25,6 +25,7 @@ def computeTriangleArea(A, B, C):
 class Straight_Line_Positive(Base_Course):
     def __init__(self, step: float, param_dict):
         super().__init__(step, param_dict)
+        self.closed = False
 
         self.target_vel_on_line = 0.0
         self.target_acc_on_line = 0.0

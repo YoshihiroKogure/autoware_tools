@@ -279,6 +279,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
     def onGoalPose(self, msg):
         self.goal_point[0] = msg.pose.position.x
         self.goal_point[1] = msg.pose.position.y
+
+        self.trajectory_position_data = None
+        self.trajectory_yaw_data = None
         self.updateNominalTargetTrajectory()
 
     def updateNominalTargetTrajectory(self):
@@ -630,6 +633,8 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     self.nearestIndex, np.min([self.nearestIndex + int(50 / self.traj_step),len(trajectory_position_data)])
                 )
 
+            self.get_logger().info("current part : " + str(self.trajectory_parts[self.nearestIndex]))
+            self.get_logger().info("achievement rate : " + str(self.trajectory_achievement_rates[self.nearestIndex]))
             tmp_traj = Trajectory()
             for i in pub_traj_index:
                 tmp_traj_point = TrajectoryPoint()
@@ -679,6 +684,38 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 marker_traj1.points.append(tmp_marker_point)
 
             marker_array.markers.append(marker_traj1)
+
+
+            # boundary
+            boundary_marker_traj1 = Marker()
+            boundary_marker_traj1.type = 4
+            boundary_marker_traj1.id = 3
+            boundary_marker_traj1.header.frame_id = "map"
+
+            boundary_marker_traj1.action = boundary_marker_traj1.ADD
+
+            boundary_marker_traj1.scale.x = 0.4
+            boundary_marker_traj1.scale.y = 0.0
+            boundary_marker_traj1.scale.z = 0.0
+
+            boundary_marker_traj1.color.a = 0.5
+            boundary_marker_traj1.color.r = 0.0
+            boundary_marker_traj1.color.g = 1.0
+            boundary_marker_traj1.color.b = 0.0
+
+            boundary_marker_traj1.lifetime.nanosec = 500000000
+            boundary_marker_traj1.frame_locked = True
+            boundary_marker_traj1.points = []
+
+            down_sampling_ = 5
+            for i in range(len(self.boundary_points) // down_sampling_):
+                boundary_tmp_marker_point = Point()
+                boundary_tmp_marker_point.x = self.boundary_points[i * down_sampling_][0]
+                boundary_tmp_marker_point.y = self.boundary_points[i * down_sampling_][1]
+                boundary_tmp_marker_point.z = 0.0
+                boundary_marker_traj1.points.append(boundary_tmp_marker_point)
+
+            marker_array.markers.append(boundary_marker_traj1)
 
             # [6-2b] whole trajectory
             marker_traj2 = Marker()

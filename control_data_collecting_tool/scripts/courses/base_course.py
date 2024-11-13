@@ -84,5 +84,5 @@ class Base_Course:
             self.achievement_rates,
         )
 
-    def update_trajectory_points(self, yaw_offset, rectangle_center_position):
+    def update_trajectory_points(self, nearestIndex, yaw_offset, rectangle_center_position):
         return self.return_trajectory_points(yaw_offset, rectangle_center_position)

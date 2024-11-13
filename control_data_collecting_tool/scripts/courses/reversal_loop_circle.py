@@ -895,7 +895,6 @@ class Reversal_Loop_Circle(Base_Course):
         rate__ = self.achievement_rates[nearestIndex]
         self.acc_hist.append(float(current_acc))
 
-        #self.phase_shift = T
         if abs(current_vel - np.max([(self.target_vel_on_line - 1.0 * self.target_acc_on_line), 0.05]) ) <   0.1 and not self.near_target_vel:
             self.near_target_vel = True
             self.phase_shift = current_time - self.previous_updated_time
@@ -927,15 +926,11 @@ class Reversal_Loop_Circle(Base_Course):
         target_vel = np.clip(target_vel, self.previous_target_vel - 0.03 * 2.0, self.previous_target_vel + 0.03 * 2.0)
         target_vel = np.min([max_vel_from_lateral_acc, target_vel])
 
-        if self.trajectory_list[1].reversing == True or self.trajectory_list[2].reversing == True:
+        if self.trajectory_list[0].reversing == True or self.trajectory_list[1].reversing == True:
             target_vel = 3.0 + 3.0 * np.sin(0.25 * np.pi * current_time / T) * np.sin(0.5 * np.pi * current_time / T)
 
-            if self.trajectory_list[1].reversing == True:
+            if self.trajectory_list[0].reversing == True:
                 target_vel = 3.0
-
- 
-            if max_curvature_on_segment > 0.7:
-                target_vel = np.min([max_vel_from_lateral_acc, target_vel])
 
         target_vel = np.max([target_vel, 0.05])
 
@@ -987,6 +982,5 @@ class Reversal_Loop_Circle(Base_Course):
             point_x = outer_circle_radius * np.cos(theta) + center_point_x
             point_y = outer_circle_radius * np.sin(theta) + center_point_y
             boundary_points.append([point_x, point_y])
-
 
         self.boundary_points = np.array(boundary_points)

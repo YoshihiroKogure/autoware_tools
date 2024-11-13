@@ -89,9 +89,9 @@ class LaneletUtils:
         t_interp = np.linspace(0.0, 1.0, max(len(oneLine), len(anotherLine)))
 
         # Perform interpolation between the two lines
-        interpolated_points = (1.0 - t_interp[:, np.newaxis]) * linear_interp_one(
+        interpolated_points = np.array([(1.0 - t_interp).tolist()]).T * linear_interp_one(
             t_interp
-        ) + t_interp[:, np.newaxis] * linear_interp_another(t_interp)
+        ) + np.array([t_interp.tolist()]).T * linear_interp_another(t_interp)
         return interpolated_points
 
 
@@ -163,6 +163,13 @@ class LaneletMapHandler:
                 lanelet.id, self.get_lanelet_centerline(lanelet)
             )
 
+            # Check for lane changes and interpolate if necessary
+            if i < len(shortest_path) - 1:
+                center_line, plus_lane_idx = self.check_lane_change(
+                    lanelet, shortest_path[i + 1], center_line
+                )
+                i += plus_lane_idx
+                
             # Adjust segments based on path position
             if i == 0:
                 segment = center_line[start_idx:]
@@ -172,14 +179,7 @@ class LaneletMapHandler:
                 segment = center_line
             segmented_route.append(segment)
 
-            # Check for lane changes and interpolate if necessary
-            if i < len(shortest_path) - 1:
-                center_line, plus_lane_idx = self.check_lane_change(
-                    lanelet, shortest_path[i + 1], center_line
-                )
-                # i += plus_lane_idx
             i += 1
-
         return segmented_route
 
     def find_nearest_lanelet_with_index(self, point):
