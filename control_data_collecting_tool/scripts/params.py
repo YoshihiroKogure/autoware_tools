@@ -16,10 +16,9 @@
 
 import numpy as np
 
+
 class Params:
     def __init__(self, param_dict):
-
-
         self.acc_kp = param_dict["acc_kp"]
         self.max_lateral_accel = param_dict["max_lateral_accel"]
 
@@ -28,22 +27,11 @@ class Params:
         velocity and steer grid
         """
         self.num_bins_v = param_dict["NUM_BINS_V"]
-        self.num_bins_steer = (
-            param_dict["NUM_BINS_STEER"]
-        )
+        self.num_bins_steer = param_dict["NUM_BINS_STEER"]
         self.num_bins_a = param_dict["NUM_BINS_A"]
-        self.v_min, self.v_max = (
-            param_dict["V_MIN"],
-            param_dict["V_MAX"]
-        )
-        self.steer_min, self.steer_max = (
-            param_dict["STEER_MIN"],
-            param_dict["STEER_MAX"]
-        )
-        self.a_min, self.a_max = (
-            param_dict["A_MIN"],
-            param_dict["A_MAX"]
-        )
+        self.v_min, self.v_max = (param_dict["V_MIN"], param_dict["V_MAX"])
+        self.steer_min, self.steer_max = (param_dict["STEER_MIN"], param_dict["STEER_MAX"])
+        self.a_min, self.a_max = (param_dict["A_MIN"], param_dict["A_MAX"])
 
         self.collected_data_counts_of_vel_acc = np.zeros(
             (self.num_bins_v, self.num_bins_a), dtype=np.int32
@@ -59,7 +47,6 @@ class Params:
         self.v_bin_centers = (self.v_bins[:-1] + self.v_bins[1:]) / 2
         self.steer_bin_centers = (self.steer_bins[:-1] + self.steer_bins[1:]) / 2
         self.a_bin_centers = (self.a_bins[:-1] + self.a_bins[1:]) / 2
-
 
         collecting_data_min_v, collecting_data_max_v = (
             param_dict["COLLECTING_DATA_V_MIN"],
