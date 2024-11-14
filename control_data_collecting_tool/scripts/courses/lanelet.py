@@ -26,26 +26,25 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interp1d
 
-
 class LaneletUtils:
     @staticmethod
-    def search_nearest_lanelet(point2d, handler, search_radius=1.0):
+    def search_nearest_lanelet(point2d, handler, search_radius = 5.0):
+
         # Set a search radius to create a bounding box around the point
         radius = BasicPoint2d(search_radius, search_radius)
         bb = BoundingBox2d(point2d - radius, point2d + radius)
-
         # Search for lanelets within the bounding box
         lanelets_at_p = handler.lanelet_map.laneletLayer.search(bb)
-
         # Find the nearest lanelet to the specified point
         nearest_lanelet = None
         min_distance = float("inf")
         for lanelet_at_p in lanelets_at_p:
-            center_point = lanelet_at_p.centerline[0]  # Use first point on centerline as reference
+            closest_idx = LaneletUtils.closest_segment(lanelet_at_p.centerline, point2d)
+            center_point = lanelet_at_p.centerline[closest_idx] 
             distance = np.linalg.norm([point2d.x - center_point.x, point2d.y - center_point.y])
             if distance < min_distance:
                 min_distance = distance
-                nearest_lanelet = handler.lanelet_map.laneletLayer[lanelet_at_p.id]
+                nearest_lanelet = lanelet_at_p
 
         return nearest_lanelet
 
@@ -58,18 +57,28 @@ class LaneletUtils:
             point = lineString[idx]
             point_suc = lineString[idx + 1]
             # Calculate the perpendicular distance from the point to the line segment
-            dist = LaneletUtils.perpendicular_distance(point, point_suc, pointToProject2d)
+            dist = LaneletUtils.approximate_distance(point, point_suc, pointToProject2d) # In trajectory generation, approximate_distance performs better than perpendicular_distance.
+            # dist = LaneletUtils.perpendicular_distance(point, point_suc, pointToProject2d)
             if dist < min_dist:
                 min_dist = dist
                 min_idx = idx
         return min_idx
 
     @staticmethod
+    def approximate_distance(point1, point2, point):
+        # Calculate the perpendicular distance from a point to a line segment
+        a = np.linalg.norm([point1.x - point.x, point1.y - point.y])
+        b = np.linalg.norm([point2.x - point.x, point2.y - point.y])
+        return np.min([a, b])
+    
+    '''
+    @staticmethod
     def perpendicular_distance(point1, point2, point):
         # Calculate the perpendicular distance from a point to a line segment
         a = np.array([point1.x - point2.x, point1.y - point2.y])
         b = np.array([point1.x - point.x, point1.y - point.y])
         return np.linalg.norm(np.cross(a, b) / np.linalg.norm(a))
+    '''
 
     @staticmethod
     def interpolate_two_lines(oneLine, anotherLine):
@@ -92,15 +101,19 @@ class LaneletUtils:
         interpolated_points = np.array([(1.0 - t_interp).tolist()]).T * linear_interp_one(
             t_interp
         ) + np.array([t_interp.tolist()]).T * linear_interp_another(t_interp)
+        
         return interpolated_points
 
 
 class LaneletMapHandler:
     def __init__(self, map_path):
+
         # Initialize the map projector and load the lanelet map
         longitude = 139.6503
         latitude = 35.6762
         projector = MGRSProjector(Origin(latitude, longitude))
+
+        # to do : error handling when loading map if necessary
         self.lanelet_map = load(map_path, projector)
 
         # Initialize traffic rules and routing graph
@@ -213,7 +226,14 @@ class LaneletMapHandler:
                 return interpolated_line, 1
         return center_line, 0
 
-    def plot_map(self):
+        
+    def plot_trajectory_on_map(self, trajectory = None, trajectory_labels = None):
+        
+        plt.close()
+
+        # Use interactive mode for plotting
+        plt.ion()
+
         # Set up the plot for displaying the lanelet map
         plt.figure(figsize=(10, 10))
         plt.xlabel("X (m)")
@@ -222,16 +242,37 @@ class LaneletMapHandler:
 
         # Plot boundaries of each lanelet
         for lanelet in self.lanelet_map.laneletLayer:
-            plt.plot([p.x for p in lanelet.leftBound], [p.y for p in lanelet.leftBound], "-g")
-            plt.plot([p.x for p in lanelet.rightBound], [p.y for p in lanelet.rightBound], "-g")
+            plt.plot([p.x for p in lanelet.leftBound], [p.y for p in lanelet.leftBound], color='gray')
+            plt.plot([p.x for p in lanelet.rightBound], [p.y for p in lanelet.rightBound], color='gray')
 
-        # Plot the centerlines of the shortest segmented route
-        for center_line in self.shortest_segmented_route:
+        # Plot the trajectory if provided
+        if trajectory is not None and trajectory_labels is None:
+            trajectory_len = len(trajectory)
             plt.plot(
-                [point[0] for point in center_line],
-                [point[1] for point in center_line],
+                [trajectory[i,0] for i in range(trajectory_len)],
+                [trajectory[i,1] for i in range(trajectory_len)],
                 linestyle="--",
                 linewidth=2,
             )
 
+        elif trajectory is not None and trajectory_labels is not None:
+
+            trajectory_len = len(trajectory)
+            previous_label = trajectory_labels[0]
+            
+            trajectory_x = []
+            trajectory_y = []
+
+            for i in range(trajectory_len):
+                if trajectory_labels[i] is not previous_label or i == trajectory_len - 1:
+                    plt.plot(trajectory_x, trajectory_y, linestyle="--", linewidth=2, label = previous_label)
+                    trajectory_x = []
+                    trajectory_y = []
+
+                trajectory_x.append(trajectory[i,0])
+                trajectory_y.append(trajectory[i,1])
+                previous_label = trajectory_labels[i]
+
+        plt.legend()
         plt.show()
+        plt.pause(1.0)

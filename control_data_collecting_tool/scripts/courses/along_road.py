@@ -22,7 +22,9 @@ import matplotlib.pyplot as plt
 
 def resample_curve(x, y, step_size):
     # Calculate the distance between each point and find the cumulative distance
-    distances = np.sqrt(np.diff(x) ** 2 + np.diff(y) ** 2)
+    dx = x[:-1] - x[1:]
+    dy = y[:-1] - y[1:]
+    distances = np.sqrt( dx ** 2 + dy ** 2)
     cumulative_distances = np.concatenate([[0], np.cumsum(distances)])
 
     num_samples = int(cumulative_distances[-1] / step_size)
@@ -52,84 +54,112 @@ class Along_Road(Base_Course):
         self.vel_idx, self.acc_idx = 0, 0
         self.previous_part = "curve"
 
-    def get_trajectory_points(
-        self, long_side_length: float, short_side_length: float, ego_point, goal_point
-    ):
+    def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point, goal_point, straight_segment_threshold=50.0, curvature_threshold=1e-2 ):
+        
+        """
+        Generates a trajectory and computes its characteristics, such as segment types (straight or curve)
+        and achievement rates for straight segments.
+
+        :param long_side_length: Length of the long side of the trajectory
+        :param short_side_length: Length of the short side of the trajectory
+        :param ego_point: Starting point coordinates
+        :param goal_point: Target point coordinates
+        :param straight_segment_threshold: Minimum length for a segment to be considered straight (default: 50.0 meters)
+        :param curvature_threshold: Maximum curvature value to classify a segment as straight (default: 1e-2)
+        """
+
+        # Get the shortest path between ego_point and goal_point
         x, y = self.handler.get_shortest_path(ego_point, goal_point)
+        if x is None or y is None:  # Exit if no valid path is found
+            return None
+        
+        # Resample the trajectory to ensure uniform step intervals
         x, y = resample_curve(x, y, self.step)
 
-        if x is None or y is None:
-            return None
-
+        # Store the trajectory points as a 2D array of [x, y]
         self.trajectory_points = np.array([x, y]).T
-        self.parts = []
+
+        # Initialize segment classification (straight or curve) and achievement rates
+        self.parts = []  
         self.achievement_rates = np.zeros(len(x))
 
-
+        # Compute the yaw (heading angle) of the trajectory
         dx = (x[1:] - x[:-1]) / self.step
         dy = (y[1:] - y[:-1]) / self.step
-        self.yaw = np.arctan2(dy, dx)
-        self.yaw = np.array(self.yaw.tolist() + [self.yaw[-1]])
+        self.yaw = np.arctan2(dy, dx)  # Calculate the heading angles
+        self.yaw = np.array(self.yaw.tolist() + [self.yaw[-1]])  # Extend to match the trajectory length
 
+        # Prepare for trajectory smoothing
+        window_size = 100  # Size of the moving average window
+        # Extend the trajectory at both ends to apply smoothing
+        augmented_x = np.concatenate((x[0] * np.ones(window_size // 2), x, x[-1] * np.ones(window_size // 2 - 1)))
+        augmented_y = np.concatenate((y[0] * np.ones(window_size // 2), y, y[-1] * np.ones(window_size // 2 - 1)))
 
-        window_size = 100
-        x = np.concatenate((x[0] * np.ones(window_size // 2), x, x[-1] * np.ones(window_size // 2 - 1)))
-        y = np.concatenate((y[0] * np.ones(window_size // 2), y, y[-1] * np.ones(window_size // 2 - 1)))
+        # Compute smoothed trajectory using a moving average
+        x_smoothed = np.convolve(augmented_x, np.ones(window_size) / window_size, mode="valid")
+        y_smoothed = np.convolve(augmented_y, np.ones(window_size) / window_size, mode="valid")
 
-        x_smoothed = np.convolve(x, np.ones(window_size) / window_size, mode="valid")
-        y_smoothed = np.convolve(y, np.ones(window_size) / window_size, mode="valid")
+        # Compute first derivatives (velocity) and second derivatives (acceleration) of the smoothed trajectory
+        dx_smoothed = (x_smoothed[1:] - x_smoothed[:-1]) / self.step
+        dy_smoothed = (y_smoothed[1:] - y_smoothed[:-1]) / self.step
+        ddx_smoothed = (dx_smoothed[1:] - dx_smoothed[:-1]) / self.step
+        ddy_smoothed = (dy_smoothed[1:] - dy_smoothed[:-1]) / self.step
 
-        dx = (x_smoothed[1:] - x_smoothed[:-1]) / self.step
-        dy = (y_smoothed[1:] - y_smoothed[:-1]) / self.step
-
-        ddx = (dx[1:] - dx[:-1]) / self.step
-        ddy = (dy[1:] - dy[:-1]) / self.step
-
+        # Calculate the curvature of the smoothed trajectory
         self.curvature = (
-            1e-9 + abs(ddx * dy[:-1] - ddy * dx[:-1]) / (dx[:-1] ** 2 + dy[:-1] ** 2 + 1e-9) ** 1.5
+            1e-9 + abs(ddx_smoothed * dy_smoothed[:-1] - ddy_smoothed * dx_smoothed[:-1]) / 
+            (dx_smoothed[:-1] ** 2 + dy_smoothed[:-1] ** 2 + 1e-9) ** 1.5
         )
+        # Extend the curvature array to match the trajectory length
         self.curvature = np.array(
             self.curvature.tolist() + [self.curvature[-1], self.curvature[-1]]
         )
 
+        # Classify each point in the trajectory as "straight" or "curve" based on curvature
         for i in range(len(self.curvature)):
-            if self.curvature[i] < 10**(-2):
-                self.parts.append("linear")
+            if self.curvature[i] < curvature_threshold:
+                self.parts.append("straight")
             else:
                 self.parts.append("curve")
 
+        # Identify start and end indices of straight segments
         previous_part = "curve"
         start_index = []
         end_index = []
         for i, part in enumerate(self.parts):
             current_part = part
 
-            if previous_part == "curve" and current_part == "linear":
+            # Detect the transition from "curve" to "straight"
+            if previous_part == "curve" and current_part == "straight":
                 start_index.append(i)
 
-            if previous_part == "linear" and current_part == "curve":
-                end_index.append(i-1)
+            # Detect the transition from "straight" to "curve"
+            if previous_part == "straight" and current_part == "curve":
+                end_index.append(i - 1)
 
+            # Handle the case where the last segment ends as "straight"
             if i == len(self.parts) - 1 and len(start_index) > len(end_index):
-                end_index.append(i-1)
+                end_index.append(i - 1)
             
             previous_part = current_part
 
+        # Assign achievement rates to sufficiently long straight segments
         for i in range(len(start_index)):
             st = start_index[i]
             ed = end_index[i]
 
-            if (ed -st) * self.step > 50.0:
-                self.achievement_rates[st:ed+1] = np.linspace(0.0, 1.0, ed-st+1)
+            # Only assign achievement rates to straight segments longer than the threshold
+            if (ed - st) * self.step > straight_segment_threshold:
+                self.achievement_rates[st:ed + 1] = np.linspace(1e-4, 1.0, ed - st + 1)
 
+        # Update segment classification based on achievement rates
         for i in range(len(self.parts)):
             if self.achievement_rates[i] > 0.0:
-                self.parts[i] = "linear"
+                self.parts[i] = "straight"
             else:
                 self.parts[i] = "curve"
 
-        plt.plot(self.achievement_rates)
-        plt.show()
+        self.handler.plot_trajectory_on_map(self.trajectory_points, self.parts)
 
 
     def get_target_velocity(
@@ -149,7 +179,7 @@ class Along_Road(Base_Course):
 
         min_data_num_margin = 5
         min_index_list = []
-        if (part == "linear" and self.previous_part == "curve") or (part == "linear" and achievement_rate < 0.05):
+        if (part == "straight" and self.previous_part == "curve") or (part == "straight" and achievement_rate < 0.05):
             self.on_line_vel_flag = True
             min_num_data = 1e12
 
@@ -252,10 +282,10 @@ class Along_Road(Base_Course):
 
         # deceleration
         if self.deceleration_rate <= achievement_rate:
-            target_vel = (5.0 * (achievement_rate - self.deceleration_rate) + 3.5 * (1 - achievement_rate) ) / (1.0 - self.deceleration_rate)
+            target_vel = (4.0 * (achievement_rate - self.deceleration_rate) + 1.5 * (1 - achievement_rate) ) / (1.0 - self.deceleration_rate)
         
         if part == "curve":
-            target_vel = 3.5
+            target_vel = 1.5
 
         if nearestIndex > 0.95 * len(self.trajectory_points):
             target_vel = 0.0
@@ -281,3 +311,4 @@ class Along_Road(Base_Course):
         lower_boundary_points.reverse()
 
         self.boundary_points = np.array(upper_boundary_points + lower_boundary_points)
+
