@@ -18,7 +18,7 @@ from courses.base_course import Base_Course
 from courses.lanelet import LaneletMapHandler
 import numpy as np
 from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
+from collections import deque
 
 def resample_curve(x, y, step_size):
     # Calculate the distance between each point and find the cumulative distance
@@ -40,7 +40,6 @@ def resample_curve(x, y, step_size):
     # Return the resampled points along the curve
     return new_x, new_y
 
-
 class Along_Road(Base_Course):
     def __init__(self, step: float, param_dict):
         super().__init__(step, param_dict)
@@ -53,6 +52,14 @@ class Along_Road(Base_Course):
         self.target_acc_on_line = 0.0
         self.vel_idx, self.acc_idx = 0, 0
         self.previous_part = "curve"
+
+        self.acc_hist = deque([float(0.0)] * 20, maxlen = 20)
+        self.vel_hist = deque([float(0.0)] * 20, maxlen = 20)
+        self.previous_updated_time = 0.0
+        self.previous_target_vel = 0.0
+        self.near_target_vel = False
+
+        self.deceleration_rate = 1.0
 
     def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point, goal_point, straight_segment_threshold=50.0, curvature_threshold=1e-2 ):
         
@@ -88,6 +95,11 @@ class Along_Road(Base_Course):
         dy = (y[1:] - y[:-1]) / self.step
         self.yaw = np.arctan2(dy, dx)  # Calculate the heading angles
         self.yaw = np.array(self.yaw.tolist() + [self.yaw[-1]])  # Extend to match the trajectory length
+        
+        ddx = (dx[1:] - dx[:-1]) / self.step
+        ddy = (dy[1:] - dy[:-1]) / self.step
+        self.curvature = 1e-9 + abs(ddx * dy[:-1] - ddy * dx[:-1]) / (dx[:-1] ** 2 + dy[:-1] ** 2 + 1e-9) ** 1.5
+        self.curvature = np.array(self.curvature.tolist() + [self.curvature[-1], self.curvature[-1]])
 
         # Prepare for trajectory smoothing
         window_size = 100  # Size of the moving average window
@@ -106,18 +118,18 @@ class Along_Road(Base_Course):
         ddy_smoothed = (dy_smoothed[1:] - dy_smoothed[:-1]) / self.step
 
         # Calculate the curvature of the smoothed trajectory
-        self.curvature = (
+        smoothed_curvature = (
             1e-9 + abs(ddx_smoothed * dy_smoothed[:-1] - ddy_smoothed * dx_smoothed[:-1]) / 
             (dx_smoothed[:-1] ** 2 + dy_smoothed[:-1] ** 2 + 1e-9) ** 1.5
         )
         # Extend the curvature array to match the trajectory length
-        self.curvature = np.array(
-            self.curvature.tolist() + [self.curvature[-1], self.curvature[-1]]
+        smoothed_curvature = np.array(
+            smoothed_curvature.tolist() + [smoothed_curvature[-1], smoothed_curvature[-1]]
         )
 
         # Classify each point in the trajectory as "straight" or "curve" based on curvature
-        for i in range(len(self.curvature)):
-            if self.curvature[i] < curvature_threshold:
+        for i in range(len(smoothed_curvature)):
+            if smoothed_curvature[i] < curvature_threshold:
                 self.parts.append("straight")
             else:
                 self.parts.append("curve")
@@ -159,6 +171,7 @@ class Along_Road(Base_Course):
             else:
                 self.parts[i] = "curve"
 
+        # Plot the trajectory on the map to check which part is classified as straight or curve
         self.handler.plot_trajectory_on_map(self.trajectory_points, self.parts)
 
 
@@ -174,13 +187,11 @@ class Along_Road(Base_Course):
         N_V = self.params.num_bins_v
         N_A = self.params.num_bins_a
 
-        max_lateral_accel = self.params.max_lateral_accel
-        max_vel_from_lateral_acc = np.sqrt(max_lateral_accel * self.curvature[nearestIndex])
-
         min_data_num_margin = 5
         min_index_list = []
-        if (part == "straight" and self.previous_part == "curve") or (part == "straight" and achievement_rate < 0.05):
-            self.on_line_vel_flag = True
+    
+        if (part == "straight" and self.previous_part == "curve") or (part == "straight" and achievement_rate < 0.1):
+            
             min_num_data = 1e12
 
             # do not collect data when velocity and acceleration are low
@@ -219,79 +230,45 @@ class Along_Road(Base_Course):
             self.acc_idx, self.vel_idx = min_index_list[np.random.randint(0, len(min_index_list))]
             self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
             self.target_vel_on_line = self.params.v_bin_centers[self.vel_idx]
+
+            i = 0
+            while self.parts[i + nearestIndex] == "straight":
+                i += 1
+            distance = i * self.step
+            stop_distance = self.target_vel_on_line ** 2 / (2 * self.params.a_max)
+            self.deceleration_rate = 1.0 - 20.0 / distance - stop_distance / distance
+            
         self.previous_part = part
 
-        
-        self.deceleration_rate = 0.55
-        if (
-            current_vel > self.target_vel_on_line - self.params.v_max / N_V / 8.0
-            and self.target_vel_on_line >= self.params.v_max / 2.0
-        ):
-            self.on_line_vel_flag = False
 
-        elif (
-            abs(current_vel - self.target_vel_on_line) < self.params.v_max / N_V / 4.0
-            and self.target_vel_on_line < self.params.v_max / 2.0
-        ):
-            self.on_line_vel_flag = False
+        T = 7.5
+        sine =  np.sin( 2 * np.pi * current_time / T ) * np.sin( np.pi * current_time / T )
 
-        # accelerate until vehicle reaches target_vel_on_line
-        if 0.0 <= achievement_rate and achievement_rate < 0.45 and self.on_line_vel_flag:
-            target_vel = self.target_vel_on_line
-
-            if (
-                current_vel > self.target_vel_on_line - self.params.v_max / N_V * 0.5
-                and self.target_acc_on_line > 2.0 * self.params.a_max / N_A
-            ):
-                target_vel = current_vel + self.target_acc_on_line / acc_kp_of_pure_pursuit
-
-        # collect target_acceleration data when current velocity is close to target_vel_on_line
-        elif (
-            achievement_rate < self.deceleration_rate
-            or self.target_vel_on_line < self.params.v_max / 2.0
-        ):
-            if collected_data_counts_of_vel_acc[self.vel_idx, self.acc_idx] > 50:
-                self.acc_idx = np.argmin(collected_data_counts_of_vel_acc[self.vel_idx, :])
-                self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
-
-            if (
-                current_vel
-                < max(
-                    [
-                        self.target_vel_on_line - 1.5 * self.params.v_max / N_V,
-                        self.params.v_max / N_V / 2.0,
-                    ]
-                )
-                and self.target_acc_on_line < 0.0
-            ):
-                self.acc_idx = np.argmin(
-                    collected_data_counts_of_vel_acc[self.vel_idx, int(N_A / 2.0) : N_A]
-                ) + int(N_A / 2)
-                self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
-
-            elif (
-                current_vel > self.target_vel_on_line + 1.5 * self.params.v_max / N_V
-                and self.target_acc_on_line > 0.0
-            ):
-                self.acc_idx = np.argmin(
-                    collected_data_counts_of_vel_acc[self.vel_idx, 0 : int(N_A / 2.0)]
-                )
-                self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
-
-            target_vel = current_vel + self.target_acc_on_line / acc_kp_of_pure_pursuit
+        if current_vel > self.target_vel_on_line:
+            target_vel = self.target_vel_on_line - 1.0 + sine
+        # acceleration
+        elif current_vel < self.target_vel_on_line - 2.0 * abs(self.target_acc_on_line):
+            target_vel = current_vel + self.params.a_max / acc_kp_of_pure_pursuit * ( 1.0 + 0.5 * sine )
+        else:
+            target_vel = current_vel + abs(self.target_acc_on_line) / acc_kp_of_pure_pursuit * ( 1.0 + 0.5 * sine )
 
         # deceleration
-        if self.deceleration_rate <= achievement_rate:
-            target_vel = (4.0 * (achievement_rate - self.deceleration_rate) + 1.5 * (1 - achievement_rate) ) / (1.0 - self.deceleration_rate)
-        
-        if part == "curve":
-            target_vel = 1.5
+        if self.deceleration_rate - 0.05 <= achievement_rate and achievement_rate < self.deceleration_rate:
+            target_vel =  current_vel -  abs(self.target_acc_on_line) / acc_kp_of_pure_pursuit * (1.0 + 0.5 * sine )
+        elif self.deceleration_rate <= achievement_rate:
+            target_vel = current_vel - self.params.a_max / acc_kp_of_pure_pursuit * ( 1.0 + 0.5 * sine )
+
+            target_vel = max(target_vel, 4.0)
+            
+
+        if part == "curve" or nearestIndex > 0.85 * len(self.trajectory_points):
+            target_vel = 4.0
 
         if nearestIndex > 0.95 * len(self.trajectory_points):
             target_vel = 0.0
         
         return target_vel
-
+    
     def return_trajectory_points(self, yaw, translation):
         # no coordinate transformation is needed
         return self.trajectory_points, self.yaw, self.curvature, self.parts, self.achievement_rates
