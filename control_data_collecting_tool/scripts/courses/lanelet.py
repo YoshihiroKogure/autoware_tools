@@ -19,7 +19,6 @@ from lanelet2.core import BasicPoint2d
 from lanelet2.core import BoundingBox2d
 from lanelet2.io import Origin
 from lanelet2.io import load
-from lanelet2.projection import UtmProjector
 from lanelet2.routing import RoutingGraph
 from lanelet2_extension_python.projection import MGRSProjector
 import matplotlib.pyplot as plt

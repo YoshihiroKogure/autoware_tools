@@ -18,7 +18,6 @@ from courses.base_course import Base_Course
 from courses.lanelet import LaneletMapHandler
 import numpy as np
 from scipy.interpolate import interp1d
-from collections import deque
 
 def resample_curve(x, y, step_size):
     # Calculate the distance between each point and find the cumulative distance
@@ -40,26 +39,35 @@ def resample_curve(x, y, step_size):
     # Return the resampled points along the curve
     return new_x, new_y
 
+def declare_along_road_params(node):
+    # Declare the parameters for the along_road course
+    node.declare_parameter("smoothing_window", 100)
+    node.declare_parameter("velocity_on_curve", 3.5)
+    node.declare_parameter("stopping_distance", 15.0)
+    node.declare_parameter("course_width", 1.5)
+
 class Along_Road(Base_Course):
     def __init__(self, step: float, param_dict):
         super().__init__(step, param_dict)
         self.closed = False
-        map_path = "/home/kogure/autoware_map/BS_map/lanelet2_map.osm"
+        map_path = param_dict["map_path"] + "/lanelet2_map.osm"
         self.handler = LaneletMapHandler(map_path)
 
-        self.on_line_vel_flag = False
-        self.target_vel_on_line = 0.0
-        self.target_acc_on_line = 0.0
+        self.window_size = param_dict["smoothing_window"]
+
+        self.set_target_velocity_on_straight_line = False
+        self.target_vel_on_straight_line = 0.0
+        self.target_acc_on_straight_line = 0.0
         self.vel_idx, self.acc_idx = 0, 0
         self.previous_part = "curve"
 
-        self.acc_hist = deque([float(0.0)] * 20, maxlen = 20)
-        self.vel_hist = deque([float(0.0)] * 20, maxlen = 20)
-        self.previous_updated_time = 0.0
-        self.previous_target_vel = 0.0
-        self.near_target_vel = False
-
         self.deceleration_rate = 1.0
+
+        self.sine_period_for_velocity = 7.5
+        self.velocity_on_curve = param_dict["velocity_on_curve"]
+        self.stopping_distance = param_dict["stopping_distance"]
+
+        self.course_width = param_dict["course_width"]
 
     def get_trajectory_points(self, long_side_length: float, short_side_length: float, ego_point, goal_point, straight_segment_threshold=50.0, curvature_threshold=1e-2 ):
         
@@ -102,7 +110,7 @@ class Along_Road(Base_Course):
         self.curvature = np.array(self.curvature.tolist() + [self.curvature[-1], self.curvature[-1]])
 
         # Prepare for trajectory smoothing
-        window_size = 100  # Size of the moving average window
+        window_size = self.window_size  # Size of the moving average window
         # Extend the trajectory at both ends to apply smoothing
         augmented_x = np.concatenate((x[0] * np.ones(window_size // 2), x, x[-1] * np.ones(window_size // 2 - 1)))
         augmented_y = np.concatenate((y[0] * np.ones(window_size // 2), y, y[-1] * np.ones(window_size // 2 - 1)))
@@ -176,98 +184,61 @@ class Along_Road(Base_Course):
 
 
     def get_target_velocity(
-        self, nearestIndex, current_time, current_vel, current_acc, collected_data_counts_of_vel_acc
+        self, nearestIndex, current_time, current_vel, current_acc, collected_data_counts_of_vel_acc, collected_data_counts_of_vel_steer
     ):
-        
         part = self.parts[nearestIndex]
         achievement_rate = self.achievement_rates[nearestIndex]
-
         acc_kp_of_pure_pursuit = self.params.acc_kp
 
-        N_V = self.params.num_bins_v
-        N_A = self.params.num_bins_a
-
-        min_data_num_margin = 5
-        min_index_list = []
-    
-        if (part == "straight" and self.previous_part == "curve") or (part == "straight" and achievement_rate < 0.1):
+        # Check and update target velocity on straight line
+        if ((part == "straight" and self.previous_part == "curve") or
+            (part == "straight" and achievement_rate < 0.05)) and not self.set_target_velocity_on_straight_line:
             
-            min_num_data = 1e12
-
-            # do not collect data when velocity and acceleration are low
-            exclude_idx_list = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (0, 2)]
-            # do not collect data when velocity and acceleration are high
-            exclude_idx_list += [
-                (-1 + N_V, -1 + N_A),
-                (-2 + N_V, -1 + N_A),
-                (-3 + N_V, -1 + N_A),
-                (-1 + N_V, -2 + N_A),
-                (-2 + N_V, -2 + N_A),
-                (-1 + N_V, -3 + N_A),
-            ]
-
-            for i in range(
-                self.params.collecting_data_min_n_v, self.params.collecting_data_max_n_v
-            ):
-                for j in range(
-                    self.params.collecting_data_min_n_a, self.params.collecting_data_max_n_a
-                ):
-                    if (i, j) not in exclude_idx_list:
-                        if (
-                            min_num_data - min_data_num_margin
-                            > collected_data_counts_of_vel_acc[i, j]
-                        ):
-                            min_num_data = collected_data_counts_of_vel_acc[i, j]
-                            min_index_list.clear()
-                            min_index_list.append((j, i))
-
-                        elif (
-                            min_num_data + min_data_num_margin
-                            > collected_data_counts_of_vel_acc[i, j]
-                        ):
-                            min_index_list.append((j, i))
-
-            self.acc_idx, self.vel_idx = min_index_list[np.random.randint(0, len(min_index_list))]
-            self.target_acc_on_line = self.params.a_bin_centers[self.acc_idx]
-            self.target_vel_on_line = self.params.v_bin_centers[self.vel_idx]
+            self.acc_idx, self.vel_idx = self.choose_target_velocity_acc(collected_data_counts_of_vel_acc)
+            self.target_acc_on_straight_line = self.params.a_bin_centers[self.acc_idx]
+            self.target_vel_on_straight_line = self.params.v_bin_centers[self.vel_idx]
 
             i = 0
             while self.parts[i + nearestIndex] == "straight":
                 i += 1
+
             distance = i * self.step
-            stop_distance = self.target_vel_on_line ** 2 / (2 * self.params.a_max)
+            stop_distance = self.target_vel_on_straight_line ** 2 / (2 * self.params.a_max)
             self.deceleration_rate = 1.0 - 20.0 / distance - stop_distance / distance
-            
+            self.set_target_velocity_on_straight_line = True
+
+        # Reset target velocity on line if entering a curve
+        if part == "curve":
+            self.set_target_velocity_on_straight_line = False
+
         self.previous_part = part
 
-
-        T = 7.5
-        sine =  np.sin( 2 * np.pi * current_time / T ) * np.sin( np.pi * current_time / T )
-
-        if current_vel > self.target_vel_on_line:
-            target_vel = self.target_vel_on_line - 1.0 + sine
-        # acceleration
-        elif current_vel < self.target_vel_on_line - 2.0 * abs(self.target_acc_on_line):
-            target_vel = current_vel + self.params.a_max / acc_kp_of_pure_pursuit * ( 1.0 + 0.5 * sine )
-        else:
-            target_vel = current_vel + abs(self.target_acc_on_line) / acc_kp_of_pure_pursuit * ( 1.0 + 0.5 * sine )
-
-        # deceleration
-        if self.deceleration_rate - 0.05 <= achievement_rate and achievement_rate < self.deceleration_rate:
-            target_vel =  current_vel -  abs(self.target_acc_on_line) / acc_kp_of_pure_pursuit * (1.0 + 0.5 * sine )
-        elif self.deceleration_rate <= achievement_rate:
-            target_vel = current_vel - self.params.a_max / acc_kp_of_pure_pursuit * ( 1.0 + 0.5 * sine )
-
-            target_vel = max(target_vel, 4.0)
-            
-
-        if part == "curve" or nearestIndex > 0.85 * len(self.trajectory_points):
-            target_vel = 4.0
-
-        if nearestIndex > 0.95 * len(self.trajectory_points):
-            target_vel = 0.0
+        # Calculate sine wave and apply to velocity
+        T = self.sine_period_for_velocity
+        sine = np.sin(2 * np.pi * current_time / T) * np.sin(np.pi * current_time / T)
         
+        if current_vel > self.target_vel_on_straight_line:
+            target_vel = self.target_vel_on_straight_line + sine
+        elif current_vel < self.target_vel_on_straight_line - 2.0 * abs(self.target_acc_on_straight_line):
+            target_vel = current_vel + self.params.a_max / acc_kp_of_pure_pursuit * (1.25 + 0.5 * sine)
+        else:
+            target_vel = current_vel + abs(self.target_acc_on_straight_line) / acc_kp_of_pure_pursuit * (1.25 + 0.5 * sine)
+
+        # Adjust for deceleration based on achievement rate
+        if self.deceleration_rate - 0.05 <= achievement_rate < self.deceleration_rate:
+            target_vel = current_vel - abs(self.target_acc_on_straight_line) / acc_kp_of_pure_pursuit * (1.25 + 0.5 * sine)
+        elif self.deceleration_rate <= achievement_rate:
+            target_vel = max(current_vel - self.params.a_max / acc_kp_of_pure_pursuit * (1.0 + 0.5 * sine), self.velocity_on_curve)
+
+        # Handle special conditions for curves or trajectory end
+        if part == "curve" or nearestIndex > len(self.trajectory_points) - int( 2.0 * self.stopping_distance / self.step):
+            target_vel = self.velocity_on_curve
+
+        if nearestIndex > len(self.trajectory_points) - int( self.stopping_distance / self.step):
+            target_vel = 0.0
+
         return target_vel
+
     
     def return_trajectory_points(self, yaw, translation):
         # no coordinate transformation is needed
@@ -281,7 +252,7 @@ class Along_Road(Base_Course):
         lower_boundary_points = []
 
         for point, yaw in zip(self.trajectory_points, self.yaw):
-            normal = np.array([np.cos(yaw + np.pi / 2.0), np.sin(yaw + np.pi / 2.0)])
+            normal = self.course_width * np.array([np.cos(yaw + np.pi / 2.0), np.sin(yaw + np.pi / 2.0)])
             upper_boundary_points.append(point + normal)
             lower_boundary_points.append(point - normal)
 

@@ -28,7 +28,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
         super().__init__("data_collecting_plotter")
 
         # callback for plot
-        self.grid_update_time_interval = 5.0
+        self.grid_update_time_interval = 2.0
         self.timer_plotter = self.create_timer(
             self.grid_update_time_interval,
             self.timer_callback_plotter,

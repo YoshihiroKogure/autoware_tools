@@ -197,7 +197,7 @@ class DataCollectingRosbagRecord(Node):
         ):  
             self.writer.subscribe_topics()
             self.writer.record()
-
+        
         # Stop recording if the operation mode changes from 3(LOCAL)
         if (
             (self.present_operation_mode_ != 3 or self._present_control_mode_ != 1)
