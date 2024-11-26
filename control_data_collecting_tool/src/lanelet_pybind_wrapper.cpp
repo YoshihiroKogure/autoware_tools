@@ -1,8 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <autoware_map_msgs/msg/lanelet_map_bin.hpp>
 #include <lanelet2_core/Forward.h>
-#include <lanelet2_traffic_rules/TrafficRulesFactory.h>
-#include <lanelet2_routing/RoutingGraph.h>
+#include <lanelet2_core/LaneletMap.h>
 #include <autoware_lanelet2_extension/utility/message_conversion.hpp>
 
 namespace py = pybind11;
@@ -11,7 +10,7 @@ namespace py = pybind11;
 lanelet::LaneletMapPtr fromBinMsgWrapper(const autoware_map_msgs::msg::LaneletMapBin& msg) {
     auto map = std::make_shared<lanelet::LaneletMap>();
     try {
-        lanelet::utils::conversion::fromBinMsg(msg, map);
+        lanelet::utils::conversion::fromBinMsg(msg, map);  // Converts message to map
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Error in fromBinMsg: ") + e.what());
     }

@@ -51,7 +51,7 @@ add_library(lanelet_pybind_module SHARED
 )
 
 # Link the necessary targets
-target_link_libraries(lanelet_pybind_module PRIVATE
+target_link_libraries(lanelet_pybind_module
   ${autoware_map_msgs_LIBRARIES}
   ${autoware_lanelet2_extension_LIBRARIES}
   lanelet2_core
@@ -68,10 +68,10 @@ set_target_properties(lanelet_pybind_module PROPERTIES
 )
 
 # Add necessary include directories
-include_directories(
-  ${autoware_map_msgs_INCLUDE_DIRS}
-  ${Python3_INCLUDE_DIRS}
-)
+#include_directories(
+#  ${autoware_map_msgs_INCLUDE_DIRS}
+#  ${Python3_INCLUDE_DIRS}
+#)
 
 # Export the plugin XML file
 pluginlib_export_plugin_description_file(rviz_common plugins/plugin_description.xml)
