@@ -28,7 +28,7 @@ from scipy.interpolate import interp1d
 
 class LaneletUtils:
     @staticmethod
-    def search_nearest_lanelet(point2d, handler, search_radius=5.0):
+    def search_nearest_lanelet(point2d, handler , search_radius=5.0):
         # Set a search radius to create a bounding box around the point
         radius = BasicPoint2d(search_radius, search_radius)
         bb = BoundingBox2d(point2d - radius, point2d + radius)
@@ -38,8 +38,8 @@ class LaneletUtils:
         nearest_lanelet = None
         min_distance = float("inf")
         for lanelet_at_p in lanelets_at_p:
-            closest_idx = LaneletUtils.closest_segment(lanelet_at_p.centerline, point2d)
-            center_point = lanelet_at_p.centerline[closest_idx]
+            closest_idx = LaneletUtils.closest_segment(lanelet_at_p.__getattribute__(handler.lanePosition), point2d)
+            center_point = lanelet_at_p.__getattribute__(handler.lanePosition)[closest_idx]
             distance = np.linalg.norm([point2d.x - center_point.x, point2d.y - center_point.y])
             if distance < min_distance:
                 min_distance = distance
