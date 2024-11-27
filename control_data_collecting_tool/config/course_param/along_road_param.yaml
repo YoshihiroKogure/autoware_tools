@@ -8,6 +8,9 @@
     length_of_straight_line: 50.0
     longitude: 139.6503
     latitude: 35.6762
+    #lanePosition: centerline
+    #lanePosition: leftBound
+    lanePosition: rightBound
 
     # Data Collection Range
     COLLECTING_DATA_V_MIN: 0.5

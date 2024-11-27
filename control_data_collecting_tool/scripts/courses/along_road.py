@@ -86,6 +86,13 @@ def declare_along_road_params(node):
         ),
     )
     node.declare_parameter(
+        "lanePosition",
+        "centerline",
+        descriptor=ParameterDescriptor(
+            description="The position within a lane"
+        ),
+    )
+    node.declare_parameter(
         "map_path",
         "",
         descriptor=ParameterDescriptor(
@@ -102,7 +109,8 @@ class Along_Road(Base_Course):
         longitude = param_dict["longitude"]
         latitude = param_dict["latitude"]
         map_path = param_dict["map_path"] + "/lanelet2_map.osm"
-        self.handler = LaneletMapHandler(map_path, longitude, latitude)
+        lanePosition = param_dict["lanePosition"]
+        self.handler = LaneletMapHandler(map_path, longitude, latitude, lanePosition)
 
         self.window_size = param_dict["smoothing_window"]
 

@@ -107,7 +107,7 @@ class LaneletUtils:
 
 
 class LaneletMapHandler:
-    def __init__(self, map_path, longitude, latitude):
+    def __init__(self, map_path, longitude, latitude, lanePosition):
         # Initialize the map projector and load the lanelet map
         projector = MGRSProjector(Origin(latitude, longitude))
 
@@ -123,6 +123,9 @@ class LaneletMapHandler:
 
         # Store the segmented shortest route
         self.shortest_segmented_route = []
+
+        # Set line position ["leftBound", "centerline", "rightBound"]
+        self.lanePosition = lanePosition
 
     def get_shortest_path(self, ego_point, goal_point):
         # ego_point = goal_point
@@ -200,7 +203,7 @@ class LaneletMapHandler:
 
         if lanelet is None:
             return None, None
-        idx = LaneletUtils.closest_segment(lanelet.centerline, point_2D)
+        idx = LaneletUtils.closest_segment(lanelet.__getattribute__(self.lanePosition), point_2D)
         return lanelet, idx
 
     def get_following_lanelet(self, lanelet):
@@ -210,7 +213,7 @@ class LaneletMapHandler:
 
     def get_lanelet_centerline(self, lanelet):
         # Return the centerline points of a lanelet
-        return [[point.x, point.y] for point in lanelet.centerline]
+        return [[point.x, point.y] for point in lanelet.__getattribute__(self.lanePosition)]
 
     def check_lane_change(self, current_lanelet, next_lanelet, center_line):
         # Check if a lane change to the next lanelet is possible
