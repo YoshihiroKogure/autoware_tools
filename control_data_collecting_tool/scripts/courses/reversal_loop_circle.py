@@ -773,7 +773,7 @@ class Reversal_Loop_Circle(Base_Course):
             "trajectory_radius"
         ]  # Circle radius for trajectory generation.
         self.enclosing_R = param_dict["enclosing_radius"]
-        self.vel_hist = deque([float(0.0)] * 30, maxlen=30)  # Velocity history for smoothing.
+        self.vel_hist = deque([float(0.0)] * 1, maxlen=1)  # Velocity history for smoothing.
         self.previous_updated_time = 0.0  # Timestamp for tracking updates.
 
         # Initialize velocity and acceleration targets for trajectory segmentation.
@@ -889,6 +889,7 @@ class Reversal_Loop_Circle(Base_Course):
         # Add initial straight and turning trajectories to the trajectory list.
         while len(self.trajectory_length_list) < 3:
             self.add_trajectory_nearly_straight()  # Add nearly straight trajectories.
+            self.add_trajectory_nearly_straight()
             self.add_trajectory_nearly_straight()
             steer_of_trajectory = 1e-9  # Minimal steer value for turning initialization.
             self.add_trajectory_for_turning(steer_of_trajectory)
@@ -1034,18 +1035,16 @@ class Reversal_Loop_Circle(Base_Course):
 
         # Handle acceleration phase
         if self.vehicle_phase == "acceleration":
-            if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
-                self.target_acc_on_segmentation
-            ):
+            #if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
+                #self.target_acc_on_segmentation
+            #):
                 # Increase velocity with a maximum allowable acceleration
-                target_vel = current_vel + self.params.a_max / acc_kp_of_pure_pursuit * (
-                    1.25 + 0.50 * sine
-                )
-            else:
+                #target_vel = current_vel + self.params.a_max / acc_kp_of_pure_pursuit * (0.75 + 0.25 * sine)
+            #else:
                 # Increase velocity with a absolute target acceleration
-                target_vel = current_vel + abs(
-                    self.target_acc_on_segmentation
-                ) / acc_kp_of_pure_pursuit * (1.25 + 0.50 * sine)
+            target_vel = current_vel + abs(
+                self.target_acc_on_segmentation
+            ) / acc_kp_of_pure_pursuit * (1.00 + 0.1 * sine)
 
             # Transition to "constant speed" phase once the target velocity is reached
             if current_vel > self.target_vel_on_segmentation:
@@ -1055,7 +1054,7 @@ class Reversal_Loop_Circle(Base_Course):
         # Handle constant speed phase
         if self.vehicle_phase == "constant_speed":
             # Modulate velocity around the target with a sine wave
-            target_vel = self.target_vel_on_segmentation + 2.0 * (-0.5 + 1.0 * sine)
+            target_vel = self.target_vel_on_segmentation * (1.00 + 0.1 * sine)
 
             # Transition to "deceleration" phase after a fixed duration
             if current_time - self.const_velocity_start_time > T:
@@ -1063,24 +1062,23 @@ class Reversal_Loop_Circle(Base_Course):
 
         # Handle deceleration phase
         if self.vehicle_phase == "deceleration":
-            if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
-                self.target_acc_on_segmentation
-            ):
+            #if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
+                #self.target_acc_on_segmentation
+            #):
                 # Decrease velocity with a maximum deceleration
-                target_vel = current_vel - self.params.a_max / acc_kp_of_pure_pursuit * (
-                    1.25 + 0.50 * sine
-                )
-            else:
+                #target_vel = current_vel - self.params.a_max / acc_kp_of_pure_pursuit * (
+                    #1.00 + 0.25 * sine
+                #)
+            #else:
                 # Decrease velocity with a absolute target acceleration
-                target_vel = current_vel - abs(
-                    self.target_acc_on_segmentation
-                ) / acc_kp_of_pure_pursuit * (1.25 + 0.50 * sine)
+            target_vel = current_vel - abs(
+                self.target_acc_on_segmentation
+            ) / acc_kp_of_pure_pursuit * (1.00 + 0.1 * sine)
 
             # Reset velocity update flag when deceleration is complete
             if (
                 current_vel
-                < self.target_vel_on_segmentation
-                - 1.0 * abs(self.target_acc_on_segmentation) / acc_kp_of_pure_pursuit
+                < 1.0
             ):
                 self.updated_target_velocity = False
 
@@ -1089,13 +1087,13 @@ class Reversal_Loop_Circle(Base_Course):
         target_vel = np.mean(self.vel_hist)
 
         # Special handling for trajectory direction changes
-        if self.trajectory_list[2].in_direction is not self.trajectory_list[2].out_direction:
+        #if self.trajectory_list[2].in_direction is not self.trajectory_list[2].out_direction:
             # Set a fixed target velocity during direction transitions
-            target_vel = 3.0 + 1.0 * sine
+            #target_vel = 4.0 + 2.0 * sine
 
         # Adjust velocity based on trajectory curvature and lateral acceleration constraints
-        if (self.trajectory_list[1].in_direction is not self.trajectory_list[1].out_direction) or (
-            self.trajectory_list[2].in_direction is not self.trajectory_list[2].out_direction
+        if (self.trajectory_list[0].in_direction is not self.trajectory_list[0].out_direction) or (
+            self.trajectory_list[1].in_direction is not self.trajectory_list[1].out_direction
         ):
             max_curvature_on_segment = 1e-9  # Initialize to a small value to avoid division by zero
             max_lateral_vel_on_segment = 1e9  # Initialize to a large value as a placeholder
@@ -1185,6 +1183,7 @@ class Reversal_Loop_Circle(Base_Course):
 
             # Add trajectory segments until the list has 4 segments
             while len(self.trajectory_length_list) < 4:
+                self.add_trajectory_nearly_straight()
                 self.add_trajectory_nearly_straight()
                 self.add_trajectory_nearly_straight()
                 self.add_trajectory_for_turning(steer_with_minimum_num_of_data)
