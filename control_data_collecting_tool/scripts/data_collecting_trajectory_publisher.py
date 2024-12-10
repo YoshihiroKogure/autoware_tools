@@ -534,6 +534,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 self.collected_data_counts_of_vel_steer,
             )
 
+            self.get_logger().info("target_acc: {}".format(self.course.target_acc_on_segmentation))
+            self.get_logger().info("target_vel: {}".format(self.course.target_vel_on_segmentation))
+
             trajectory_longitudinal_velocity_data = np.array(
                 [target_vel for _ in range(len(trajectory_position_data))]
             )

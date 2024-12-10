@@ -63,7 +63,7 @@ class Params:
             min([np.digitize(collecting_data_max_v, self.v_bins) - 1, self.num_bins_v - 1]) + 1
         )
 
-        self.collecting_data_min_n_a = max([np.digitize(collecting_data_min_a, self.v_bins) - 1, 0])
+        self.collecting_data_min_n_a = max([np.digitize(collecting_data_min_a, self.a_bins) - 1, 0])
         self.collecting_data_max_n_a = (
-            min([np.digitize(collecting_data_max_a, self.v_bins) - 1, self.num_bins_a - 1]) + 1
+            min([np.digitize(collecting_data_max_a, self.a_bins) - 1, self.num_bins_a - 1]) + 1
         )

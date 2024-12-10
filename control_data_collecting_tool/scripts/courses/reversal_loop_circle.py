@@ -1030,21 +1030,21 @@ class Reversal_Loop_Circle(Base_Course):
             self.updated_target_velocity = True
 
         acc_kp_of_pure_pursuit = self.params.acc_kp  # Proportional gain for acceleration control
-        T = 10.0  # Period of the sine wave used to modulate velocity
+        T = 5.0  # Period of the sine wave used to modulate velocity
         sine = np.sin(2 * np.pi * current_time / T)  # Sine wave for smooth velocity modulation
 
         # Handle acceleration phase
         if self.vehicle_phase == "acceleration":
-            #if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
-                #self.target_acc_on_segmentation
-            #):
-                # Increase velocity with a maximum allowable acceleration
-                #target_vel = current_vel + self.params.a_max / acc_kp_of_pure_pursuit * (0.75 + 0.25 * sine)
-            #else:
-                # Increase velocity with a absolute target acceleration
-            target_vel = current_vel + abs(
+            if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
                 self.target_acc_on_segmentation
-            ) / acc_kp_of_pure_pursuit * (1.00 + 0.1 * sine)
+            ):
+                # Increase velocity with a maximum allowable acceleration
+                target_vel = current_vel + self.params.a_max / acc_kp_of_pure_pursuit * (0.75 + 0.25 * sine)
+            else:
+                # Increase velocity with a absolute target acceleration
+                target_vel = current_vel + abs(
+                    self.target_acc_on_segmentation
+                ) / acc_kp_of_pure_pursuit * (0.75 + 0.25 * sine)
 
             # Transition to "constant speed" phase once the target velocity is reached
             if current_vel > self.target_vel_on_segmentation:
@@ -1054,26 +1054,24 @@ class Reversal_Loop_Circle(Base_Course):
         # Handle constant speed phase
         if self.vehicle_phase == "constant_speed":
             # Modulate velocity around the target with a sine wave
-            target_vel = self.target_vel_on_segmentation * (1.00 + 0.1 * sine)
+            target_vel = self.target_vel_on_segmentation + 1.0 * np.sin(2 * np.pi * current_time / 5.0) * np.sin(2 * np.pi * current_time / 10.0) - 0.5
 
             # Transition to "deceleration" phase after a fixed duration
-            if current_time - self.const_velocity_start_time > T:
+            if current_time - self.const_velocity_start_time > 10.0:
                 self.vehicle_phase = "deceleration"
 
         # Handle deceleration phase
         if self.vehicle_phase == "deceleration":
-            #if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
-                #self.target_acc_on_segmentation
-            #):
-                # Decrease velocity with a maximum deceleration
-                #target_vel = current_vel - self.params.a_max / acc_kp_of_pure_pursuit * (
-                    #1.00 + 0.25 * sine
-                #)
-            #else:
-                # Decrease velocity with a absolute target acceleration
-            target_vel = current_vel - abs(
+            if current_vel < self.target_vel_on_segmentation - 1.0 * abs(
                 self.target_acc_on_segmentation
-            ) / acc_kp_of_pure_pursuit * (1.00 + 0.1 * sine)
+            ):
+                # Decrease velocity with a maximum deceleration
+                target_vel = current_vel - self.params.a_max / acc_kp_of_pure_pursuit * (0.75 + 0.25 * sine)
+            else:
+                # Decrease velocity with a absolute target acceleration
+                target_vel = current_vel - abs(
+                    self.target_acc_on_segmentation
+                ) / acc_kp_of_pure_pursuit * (0.75 + 0.25 * sine)
 
             # Reset velocity update flag when deceleration is complete
             if (

@@ -50,7 +50,7 @@ class Base_Course:
 
     def choose_target_velocity_acc(self, collected_data_counts_of_vel_acc):
         min_num_data = 1e12
-        min_data_num_margin = 20
+        min_data_num_margin = 10
         min_index_list = []
 
         for i in range(self.params.collecting_data_min_n_v, self.params.collecting_data_max_n_v):
