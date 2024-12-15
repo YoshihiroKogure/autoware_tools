@@ -40,10 +40,10 @@ def getYaw(orientation_xyzw):
     return R.from_quat(orientation_xyzw.reshape(-1, 4)).as_euler("xyz")[:, 2]
 
 
-class DataCollectingPurePursuitTrajectoryFollower(Node):
+class DataCollectingPurePursuitTrajectoryFollowerAccelInput(Node):
     def __init__(self):
-        super().__init__("data_collecting_pure_pursuit_trajectory_follower")
-
+        super().__init__("data_collecting_pure_pursuit_trajectory_follower_accel_input")
+        
         self.declare_parameter(
             "pure_pursuit_type",
             "linearized",
@@ -618,11 +618,11 @@ class DataCollectingPurePursuitTrajectoryFollower(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    data_collecting_pure_pursuit_trajectory_follower = DataCollectingPurePursuitTrajectoryFollower()
+    data_collecting_pure_pursuit_trajectory_follower_accel_input = DataCollectingPurePursuitTrajectoryFollowerAccelInput()
 
-    rclpy.spin(data_collecting_pure_pursuit_trajectory_follower)
+    rclpy.spin(data_collecting_pure_pursuit_trajectory_follower_accel_input)
 
-    data_collecting_pure_pursuit_trajectory_follower.destroy_node()
+    data_collecting_pure_pursuit_trajectory_follower_accel_input.destroy_node()
     rclpy.shutdown()
 
 

@@ -34,6 +34,14 @@ def get_course_name(yaml_file_path):
     course_name = data.get("/**", {}).get("ros__parameters", {}).get("COURSE_NAME", None)
     return course_name
 
+def get_control_mode(yaml_file_path):
+    with open(yaml_file_path, "r") as file:
+        data = yaml.safe_load(file)
+
+    # get 'COURSE_NAME'
+    control_mode = data.get("/**", {}).get("ros__parameters", {}).get("CONTROL_MODE", None)
+    return control_mode
+
 
 def generate_launch_description():
     # Define the argument for map_path
@@ -55,44 +63,87 @@ def generate_launch_description():
         package_share_directory, "config/course_param", course_name + "_param.yaml"
     )
 
-    return launch.LaunchDescription(
-        [
-            map_path_arg,
-            Node(
-                package="control_data_collecting_tool",
-                executable="data_collecting_pure_pursuit_trajectory_follower.py",
-                name="data_collecting_pure_pursuit_trajectory_follower",
-                parameters=[common_param_file_path],
-            ),
-            Node(
-                package="control_data_collecting_tool",
-                executable="data_collecting_trajectory_publisher.py",
-                name="data_collecting_trajectory_publisher",
-                parameters=[
-                    common_param_file_path,
-                    course_specific_param_file_path,
-                    {"map_path": map_path},
-                ],
-            ),
-            Node(
-                package="control_data_collecting_tool",
-                executable="data_collecting_plotter.py",
-                name="data_collecting_plotter",
-                parameters=[common_param_file_path],
-            ),
-            Node(
-                package="control_data_collecting_tool",
-                executable="data_collecting_rosbag_record.py",
-                name="data_collecting_rosbag_record",
-            ),
-            Node(
-                package="control_data_collecting_tool",
-                executable="data_collecting_data_counter.py",
-                name="data_collecting_data_counter",
-                parameters=[common_param_file_path],
-            ),
-        ]
-    )
+    # Get the control mode
+    control_mode = get_control_mode(common_param_file_path)
+    
+    if control_mode == "accel_input":
+        return launch.LaunchDescription(
+            [
+                map_path_arg,
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_pure_pursuit_trajectory_follower_accel_input.py",
+                    name="data_collecting_pure_pursuit_trajectory_follower_accel_input",
+                    parameters=[common_param_file_path],
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_trajectory_publisher.py",
+                    name="data_collecting_trajectory_publisher",
+                    parameters=[
+                        common_param_file_path,
+                        course_specific_param_file_path,
+                        {"map_path": map_path},
+                    ],
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_plotter.py",
+                    name="data_collecting_plotter",
+                    parameters=[common_param_file_path],
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_rosbag_record.py",
+                    name="data_collecting_rosbag_record",
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_data_counter.py",
+                    name="data_collecting_data_counter",
+                    parameters=[common_param_file_path],
+                ),
+            ]
+        )
+    elif control_mode == "actuation_cmd":
+        return launch.LaunchDescription(
+            [
+                map_path_arg,
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_pure_pursuit_trajectory_follower_actuation_cmd.py",
+                    name="data_collecting_pure_pursuit_trajectory_follower_actuation_cmd",
+                    parameters=[common_param_file_path],
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_trajectory_publisher.py",
+                    name="data_collecting_trajectory_publisher",
+                    parameters=[
+                        common_param_file_path,
+                        course_specific_param_file_path,
+                        {"map_path": map_path},
+                    ],
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_plotter.py",
+                    name="data_collecting_plotter",
+                    parameters=[common_param_file_path],
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_rosbag_record.py",
+                    name="data_collecting_rosbag_record",
+                ),
+                Node(
+                    package="control_data_collecting_tool",
+                    executable="data_collecting_data_counter.py",
+                    name="data_collecting_data_counter",
+                    parameters=[common_param_file_path],
+                ),
+            ]
+        ) 
 
 
 if __name__ == "__main__":

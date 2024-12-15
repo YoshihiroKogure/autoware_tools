@@ -70,6 +70,26 @@ class Base_Course:
 
         return min_index_list[np.random.randint(0, len(min_index_list))]
 
+    def choose_target_velocity_and_actuation_cmd(
+        self, collected_data_counts_of_vel_pedal_input,
+    ):
+        min_num_data = 1e12
+        min_data_num_margin = 20
+        min_index_list = []
+
+        for i in range(len(collected_data_counts_of_vel_pedal_input)):
+            for j in range(len(collected_data_counts_of_vel_pedal_input[0])):
+                if min_num_data - min_data_num_margin > collected_data_counts_of_vel_pedal_input[i, j]:
+                    min_num_data = collected_data_counts_of_vel_pedal_input[i, j]
+                    min_index_list.clear()
+                    min_index_list.append((j, i))
+
+                elif min_num_data + min_data_num_margin > collected_data_counts_of_vel_pedal_input[i, j]:
+                    min_index_list.append((j, i))
+
+        return min_index_list[np.random.randint(0, len(min_index_list))]
+
+
     def get_target_velocity(
         self,
         nearestIndex,
@@ -81,7 +101,7 @@ class Base_Course:
         mask_vel_acc,
         mask_vel_steer,
     ):
-        pass
+        pass            
 
     def set_vertices(self, A, B, C, D):
         self.A = A

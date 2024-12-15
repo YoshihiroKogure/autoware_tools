@@ -1,6 +1,9 @@
 /**:
   ros__parameters:
-    LOAD_ROSBAG2_FILES: true
+    CONTROL_MODE: actuation_cmd # accel_input
+    LOAD_ROSBAG2_FILES: false
+    accel_map_path: /home/user/pilot-auto.xx1/src/autoware/universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/accel_map.csv
+    brake_map_path: /home/user/pilot-auto.xx1/src/autoware/universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/brake_map.csv
 
     # COURSE_NAME: eight_course
     # COURSE_NAME: u_shaped_return
@@ -14,6 +17,8 @@
     NUM_BINS_A: 10
     NUM_BINS_ABS_STEER_RATE: 5
     NUM_BINS_JERK: 10
+    NUM_BINS_ACCEL_PEDAL_INPUT: 3
+    NUM_BINS_BRAKE_PEDAL_INPUT: 4
     V_MIN: 0.0
     V_MAX: 11.5
     STEER_MIN: -0.6
@@ -24,6 +29,10 @@
     ABS_STEER_RATE_MAX: 0.3
     JERK_MIN: -0.5
     JERK_MAX: 0.5
+    ACCEL_PEDAL_INPUT_MAX: 0.4
+    ACCEL_PEDAL_INPUT_MIN: 0.01
+    BRAKE_PEDAL_INPUT_MAX: 0.6
+    BRAKE_PEDAL_INPUT_MIN: 0.0
 
     MASK_NAME: default
     VEL_ACC_THRESHOLD: 40
