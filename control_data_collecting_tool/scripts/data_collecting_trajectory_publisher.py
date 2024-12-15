@@ -510,7 +510,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                 ((trajectory_position_data[index_range] - present_position[:2]) ** 2).sum(axis=1)
             )
             index_array_near = np.argsort(distance)
-            self.nearestIndex = index_range[index_array_near[0]]
+            
+            if self.present_operation_mode_ == 3:
+                self.nearestIndex = index_range[index_array_near[0]]
             # set target velocity
             present_vel = present_linear_velocity[0]
             present_acc = self._present_acceleration.accel.accel.linear.x
