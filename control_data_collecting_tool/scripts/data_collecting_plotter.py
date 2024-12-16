@@ -180,14 +180,14 @@ class DataCollectingPlotter(DataCollectingBaseNode):
         self.heatmap = sns.heatmap(
             self.collected_data_counts_of_vel_acc.T,
             annot=True,
-            cmap=self.cmap,
+            cmap="coolwarm",#self.cmap,
             norm=self.vel_acc_heatmap_norm,
             xticklabels=np.round(self.v_bin_centers, 2),
             yticklabels=np.round(self.a_bin_centers, 2),
             ax=self.axs[1],
             linewidths=0.1,
             linecolor="gray",
-            cbar_kws={"ticks": [0, self.VEL_ACC_THRESHOLD]},
+            #cbar_kws={"ticks": [0, self.VEL_ACC_THRESHOLD]},
         )
 
         self.axs[1].set_xlabel("Velocity bins")
@@ -215,14 +215,14 @@ class DataCollectingPlotter(DataCollectingBaseNode):
         self.heatmap = sns.heatmap(
             self.collected_data_counts_of_vel_steer.T,
             annot=True,
-            cmap=self.cmap,
+            cmap="coolwarm",#self.cmap,
             norm=self.vel_steer_heatmap_norm,
             xticklabels=np.round(self.v_bin_centers, 2),
             yticklabels=np.round(self.steer_bin_centers, 2),
             ax=self.axs[2],
             linewidths=0.1,
             linecolor="gray",
-            cbar_kws={"ticks": [0, self.VEL_STEER_THRESHOLD]},
+            #cbar_kws={"ticks": [0, self.VEL_STEER_THRESHOLD]},
         )
 
         # Display mask
@@ -251,14 +251,14 @@ class DataCollectingPlotter(DataCollectingBaseNode):
         self.heatmap = sns.heatmap(
             self.collected_data_counts_of_vel_abs_steer_rate.T,
             annot=True,
-            cmap=self.cmap,
+            cmap="coolwarm",#self.cmap,
             norm=self.vel_abs_steer_rate_heatmap_norm,
             xticklabels=np.round(self.v_bin_centers, 2),
             yticklabels=np.round(self.abs_steer_rate_bin_centers, 2),
             ax=self.axs[3],
             linewidths=0.1,
             linecolor="gray",
-            cbar_kws={"ticks": [0, self.VEL_STEER_THRESHOLD]},
+            #cbar_kws={"ticks": [0, self.VEL_STEER_THRESHOLD]},
         )
 
         # Display mask
