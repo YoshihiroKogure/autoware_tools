@@ -194,7 +194,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
         self.axs[1].set_ylabel("Acceleration bins")
 
         # Display mask
-        for i in range(self.collected_data_counts_of_vel_acc.shape[0]):
+        '''for i in range(self.collected_data_counts_of_vel_acc.shape[0]):
             for j in range(self.collected_data_counts_of_vel_acc.shape[1]):
                 if self.mask_vel_acc[i, j] == 1:
                     rect = Rectangle(
@@ -205,7 +205,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
                     rect = Rectangle(
                         (i, j), 1, 1, linewidth=0.25, edgecolor="black", facecolor="gray"
                     )
-                    self.axs[1].add_patch(rect)
+                    self.axs[1].add_patch(rect)'''
 
         for collection in self.axs[2].collections:
             if collection.colorbar is not None:
@@ -226,7 +226,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
         )
 
         # Display mask
-        for i in range(self.collected_data_counts_of_vel_steer.shape[0]):
+        '''for i in range(self.collected_data_counts_of_vel_steer.shape[0]):
             for j in range(self.collected_data_counts_of_vel_steer.shape[1]):
                 if self.mask_vel_steer[i, j] == 1:
                     rect = Rectangle(
@@ -237,7 +237,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
                     rect = Rectangle(
                         (i, j), 1, 1, linewidth=0.25, edgecolor="black", facecolor="gray"
                     )
-                    self.axs[2].add_patch(rect)
+                    self.axs[2].add_patch(rect)'''
 
         # update collected steer and velocity grid
         self.axs[2].set_xlabel("Velocity bins")
@@ -262,7 +262,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
         )
 
         # Display mask
-        for i in range(self.collected_data_counts_of_vel_abs_steer_rate.shape[0]):
+        '''for i in range(self.collected_data_counts_of_vel_abs_steer_rate.shape[0]):
             for j in range(self.collected_data_counts_of_vel_abs_steer_rate.shape[1]):
                 if self.mask_vel_abs_steer_rate[i, j] == 1:
                     rect = Rectangle(
@@ -273,7 +273,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
                     rect = Rectangle(
                         (i, j), 1, 1, linewidth=0.25, edgecolor="black", facecolor="gray"
                     )
-                    self.axs[3].add_patch(rect)
+                    self.axs[3].add_patch(rect)'''
 
         # update collected steer and velocity grid
         self.axs[3].set_xlabel("Velocity bins")
