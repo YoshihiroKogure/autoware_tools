@@ -77,7 +77,7 @@ class Base_Course:
         min_data_num_margin = 20
         min_index_list = []
 
-        for i in range(len(collected_data_counts_of_vel_pedal_input)):
+        for i in range(self.params.collecting_data_min_n_v, self.params.collecting_data_max_n_v):
             for j in range(len(collected_data_counts_of_vel_pedal_input[0])):
                 if min_num_data - min_data_num_margin > collected_data_counts_of_vel_pedal_input[i, j]:
                     min_num_data = collected_data_counts_of_vel_pedal_input[i, j]

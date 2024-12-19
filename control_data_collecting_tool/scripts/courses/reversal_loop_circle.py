@@ -1153,6 +1153,7 @@ class Reversal_Loop_Circle(Base_Course):
 
     def get_target_pedal_input(
         self,
+        nearestIndex,
         current_time,
         current_vel,
         collected_data_counts_of_vel_accel_pedal_input,
@@ -1183,29 +1184,16 @@ class Reversal_Loop_Circle(Base_Course):
 
         # Handle acceleration phase
         if self.vehicle_phase == "acceleration":
-            target_pedal_input =  self.target_accel_pedal_input_on_segmentation + 0.05 * sine**2
+            target_pedal_input = self.target_accel_pedal_input_on_segmentation + 0.01 * sine**2
             if current_time  - self.acceleration_start_time > 20.0:
-                target_pedal_input = 0.5 * sine**2
+                target_pedal_input = 0.4
             if current_vel > max_velocity:
-                self.vehicle_phase = "constant_speed"
-                self.const_velocity_start_time = current_time
-
-        # Handle constant speed phase
-        if self.vehicle_phase == "constant_speed":
-            # Modulate velocity around the target with a sine wave
-            if current_vel > max_velocity:
-                target_pedal_input = -0.5 * sine**2
-            elif current_vel <= max_velocity:
-                target_pedal_input = 0.5 * sine**2
-
-            # Transition to "deceleration" phase after a fixed duration
-            if current_time - self.const_velocity_start_time > T:
                 self.vehicle_phase = "deceleration"
                 self.deceleration_start_time = current_time
 
         # Handle deceleration phase
         if self.vehicle_phase == "deceleration":
-            target_pedal_input =  - self.target_brake_pedal_input_on_segmentation - 0.05 * sine**2
+            target_pedal_input =  - self.target_brake_pedal_input_on_segmentation - 0.15 * sine**2
             # Reset velocity update flag when deceleration is complete
             if (
                 current_vel

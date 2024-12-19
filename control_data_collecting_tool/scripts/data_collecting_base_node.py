@@ -155,22 +155,22 @@ class DataCollectingBaseNode(Node):
 
         self.declare_parameter(
             "ACCEL_PEDAL_INPUT_MAX",
-            0.3,
+            0.40,
         )
 
         self.declare_parameter(
             "ACCEL_PEDAL_INPUT_MIN",
-            0.01,
+            0.00,
         )
 
         self.declare_parameter(
             "NUM_BINS_ACCEL_PEDAL_INPUT",
-            3
+            4
         )
 
         self.declare_parameter(
             "BRAKE_PEDAL_INPUT_MAX",
-            0.4,
+            0.40,
         )
 
         self.declare_parameter(
@@ -180,7 +180,7 @@ class DataCollectingBaseNode(Node):
 
         self.declare_parameter(
             "NUM_BINS_BRAKE_PEDAL_INPUT",
-            5
+            8
         )
 
         self.ego_point = np.array([0.0, 0.0])

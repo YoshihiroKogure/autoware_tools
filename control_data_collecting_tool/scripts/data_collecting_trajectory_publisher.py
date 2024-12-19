@@ -581,7 +581,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     self.mask_vel_steer,
                 )
             elif self.CONTROL_MODE == "actuation_cmd":
-                target_pedal_input = self.course.get_target_pedal_input( current_time, present_vel, self.collected_data_counts_of_vel_accel_pedal_input, self.collected_data_counts_of_vel_brake_pedal_input)
+                target_pedal_input = self.course.get_target_pedal_input( self.nearestIndex, current_time, present_vel, self.collected_data_counts_of_vel_accel_pedal_input, self.collected_data_counts_of_vel_brake_pedal_input)
                 self.get_logger().info("target_accel_pedal_input_on_segmentation : " + str(self.course.target_accel_pedal_input_on_segmentation))
                 self.get_logger().info("target_brake_pedal_input_on_segmentation : " + str(self.course.target_brake_pedal_input_on_segmentation))
             else:

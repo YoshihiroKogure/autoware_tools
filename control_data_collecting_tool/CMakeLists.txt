@@ -37,6 +37,7 @@ install(PROGRAMS
   scripts/data_collecting_pure_pursuit_trajectory_follower_actuation_cmd.py
   scripts/accel_brake_map.py
   scripts/data_collecting_trajectory_publisher.py
+  scripts/data_collecting_actuation_plotter.py
   scripts/data_collecting_plotter.py
   scripts/data_collecting_rosbag_record.py
   scripts/data_collecting_data_counter.py
