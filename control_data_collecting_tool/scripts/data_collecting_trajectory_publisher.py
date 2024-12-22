@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from accel_brake_map import AccelBrakeMapConverter
 from autoware_planning_msgs.msg import Trajectory
 from autoware_planning_msgs.msg import TrajectoryPoint
 from courses.load_course import declare_course_params
 from courses.load_course import load_course
-from accel_brake_map import AccelBrakeMapConverter
 from data_collecting_base_node import DataCollectingBaseNode
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import PolygonStamped
@@ -60,15 +60,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
     def __init__(self):
         super().__init__("data_collecting_trajectory_publisher")
 
-        self.declare_parameter(
-            "accel_map_path",
-            ""
-        )
+        self.declare_parameter("accel_map_path", "")
 
-        self.declare_parameter(
-            "brake_map_path",
-            ""
-        )
+        self.declare_parameter("brake_map_path", "")
 
         self.declare_parameter(
             "acc_kp",
@@ -228,7 +222,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         # get accel brake map converter
         path_to_accel_map = self.get_parameter("accel_map_path").get_parameter_value().string_value
         path_to_brake_map = self.get_parameter("brake_map_path").get_parameter_value().string_value
-        self.accel_brake_map_converter = AccelBrakeMapConverter(path_to_accel_map, path_to_brake_map)
+        self.accel_brake_map_converter = AccelBrakeMapConverter(
+            path_to_accel_map, path_to_brake_map
+        )
 
         self.trajectory_position_data = None
         self.trajectory_yaw_data = None
@@ -267,22 +263,25 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         )
         self.collected_data_counts_of_vel_steer_subscription_
 
-        self.collected_data_counts_of_vel_accel_pedal_input_subscription_ = self.create_subscription(
-            Int32MultiArray,
-            "/control_data_collecting_tools/collected_data_counts_of_vel_accel_pedal_input",
-            self.subscribe_collected_data_counts_of_vel_accel_pedal_input,
-            10,
+        self.collected_data_counts_of_vel_accel_pedal_input_subscription_ = (
+            self.create_subscription(
+                Int32MultiArray,
+                "/control_data_collecting_tools/collected_data_counts_of_vel_accel_pedal_input",
+                self.subscribe_collected_data_counts_of_vel_accel_pedal_input,
+                10,
+            )
         )
         self.collected_data_counts_of_vel_accel_pedal_input_subscription_
 
-        self.collected_data_counts_of_vel_brake_pedal_input_subscription_ = self.create_subscription(
-            Int32MultiArray,
-            "/control_data_collecting_tools/collected_data_counts_of_vel_brake_pedal_input",
-            self.subscribe_collected_data_counts_of_vel_brake_pedal_input,
-            10,
+        self.collected_data_counts_of_vel_brake_pedal_input_subscription_ = (
+            self.create_subscription(
+                Int32MultiArray,
+                "/control_data_collecting_tools/collected_data_counts_of_vel_brake_pedal_input",
+                self.subscribe_collected_data_counts_of_vel_brake_pedal_input,
+                10,
+            )
         )
         self.collected_data_counts_of_vel_brake_pedal_input_subscription_
-
 
         if debug_matplotlib_plot_flag:
             self.fig, self.axs = plt.subplots(4, 1, figsize=(12, 20))
@@ -297,16 +296,20 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
         rows = msg.layout.dim[0].size
         cols = msg.layout.dim[1].size
         self.collected_data_counts_of_vel_steer = np.array(msg.data).reshape((rows, cols))
-    
+
     def subscribe_collected_data_counts_of_vel_accel_pedal_input(self, msg):
         rows = msg.layout.dim[0].size
         cols = msg.layout.dim[1].size
-        self.collected_data_counts_of_vel_accel_pedal_input= np.array(msg.data).reshape((rows, cols))
+        self.collected_data_counts_of_vel_accel_pedal_input = np.array(msg.data).reshape(
+            (rows, cols)
+        )
 
     def subscribe_collected_data_counts_of_vel_brake_pedal_input(self, msg):
         rows = msg.layout.dim[0].size
         cols = msg.layout.dim[1].size
-        self.collected_data_counts_of_vel_brake_pedal_input= np.array(msg.data).reshape((rows, cols))
+        self.collected_data_counts_of_vel_brake_pedal_input = np.array(msg.data).reshape(
+            (rows, cols)
+        )
 
     def onDataCollectingArea(self, msg):
         self._data_collecting_area_polygon = msg
@@ -446,13 +449,13 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
 
     def callback_trajectory_generator(self):
         if (
-            ((
+            (
                 self._present_kinematic_state.pose is not None
                 and self._present_acceleration.accel is not None
                 and self.trajectory_position_data is not None
             )
             or self.trajectory_position_data is not None
-            or self.trajectory_yaw_data is not None)
+            or self.trajectory_yaw_data is not None
         ):
             # [0] update nominal target trajectory if changing related ros2 params
             target_longitudinal_velocity = (
@@ -581,9 +584,18 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
                     self.mask_vel_steer,
                 )
             elif self.CONTROL_MODE == "actuation_cmd":
-                target_pedal_input = self.course.get_target_pedal_input( self.nearestIndex, current_time, present_vel, self.collected_data_counts_of_vel_accel_pedal_input, self.collected_data_counts_of_vel_brake_pedal_input)
-                self.get_logger().info("target_accel_pedal_input_on_segmentation : " + str(self.course.target_accel_pedal_input_on_segmentation))
-                self.get_logger().info("target_brake_pedal_input_on_segmentation : " + str(self.course.target_brake_pedal_input_on_segmentation))
+                target_pedal_input = self.course.get_target_pedal_input(
+                    self.nearestIndex,
+                    current_time,
+                    present_vel,
+                    self.collected_data_counts_of_vel_accel_pedal_input,
+                    self.collected_data_counts_of_vel_brake_pedal_input,
+                )
+            elif (
+                self.CONTROL_MODE == "external_accel_input"
+                or self.CONTROL_MODE == "external_actuation_cmd"
+            ):
+                pass  # do nothing
             else:
                 self.get_logger().error(f"Invalid control mode : {self.CONTROL_MODE}")
 
@@ -674,8 +686,9 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             # [6] publish
 
             # [6-1] publish pedal input
-            self.pedal_input_pub_.publish(Float32(data=float(target_pedal_input)))
-            
+            if self.CONTROL_MODE == "accel_input":
+                self.pedal_input_pub_.publish(Float32(data=float(target_pedal_input)))
+
             # [6-2] publish trajectory
             if self.course.closed:
                 pub_trajectory_index = np.arange(

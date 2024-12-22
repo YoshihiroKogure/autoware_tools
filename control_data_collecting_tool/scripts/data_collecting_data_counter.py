@@ -259,18 +259,31 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
         if actuation_cmd is not None:
             accel_pedal_input = actuation_cmd.actuation.accel_cmd
             brake_pedal_input = actuation_cmd.actuation.brake_cmd
-            accel_pedal_input_bin = np.digitize(accel_pedal_input, self.accel_pedal_input_bin_centers) - 1
-            brake_pedal_input_bin = np.digitize(brake_pedal_input, self.brake_pedal_input_bin_centers) - 1
+            accel_pedal_input_bin = (
+                np.digitize(accel_pedal_input, self.accel_pedal_input_bin_centers) - 1
+            )
+            brake_pedal_input_bin = (
+                np.digitize(brake_pedal_input, self.brake_pedal_input_bin_centers) - 1
+            )
             v_bin = np.digitize(current_vel, self.v_bins) - 1
 
             if accel_pedal_input > 1e-3:
-                if 0 <= v_bin < self.num_bins_v and 0 <= accel_pedal_input_bin < self.num_bins_accel_pedal_input:
-                    self.collected_data_counts_of_vel_accel_pedal_input[v_bin, accel_pedal_input_bin] += 1
-            
-            if brake_pedal_input > 1e-3:
-                if 0 <= v_bin < self.num_bins_v and 0 <= brake_pedal_input_bin < self.num_bins_brake_pedal_input:
-                    self.collected_data_counts_of_vel_brake_pedal_input[v_bin, brake_pedal_input_bin] += 1
+                if (
+                    0 <= v_bin < self.num_bins_v
+                    and 0 <= accel_pedal_input_bin < self.num_bins_accel_pedal_input
+                ):
+                    self.collected_data_counts_of_vel_accel_pedal_input[
+                        v_bin, accel_pedal_input_bin
+                    ] += 1
 
+            if brake_pedal_input > 1e-3:
+                if (
+                    0 <= v_bin < self.num_bins_v
+                    and 0 <= brake_pedal_input_bin < self.num_bins_brake_pedal_input
+                ):
+                    self.collected_data_counts_of_vel_brake_pedal_input[
+                        v_bin, brake_pedal_input_bin
+                    ] += 1
 
     # call back for counting data points
     def timer_callback_counter(self):
@@ -328,7 +341,7 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
             self.collected_data_counts_of_vel_jerk,
         )
 
-        # 
+        #
         publish_Int32MultiArray(
             self.collected_data_counts_of_vel_accel_pedal_input_publisher_,
             self.collected_data_counts_of_vel_accel_pedal_input,

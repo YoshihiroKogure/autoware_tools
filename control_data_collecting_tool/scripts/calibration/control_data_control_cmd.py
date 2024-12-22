@@ -15,11 +15,9 @@
 # limitations under the License.
 
 from datetime import datetime
-import os
-import subprocess
 import sys
-import time
 
+from std_msgs.msg import Float32
 from autoware_control_msgs.msg import Control
 from autoware_vehicle_msgs.msg import ControlModeReport
 from autoware_vehicle_msgs.msg import GearCommand
@@ -34,15 +32,12 @@ import rclpy
 from rclpy.node import Node
 from tier4_vehicle_msgs.msg import ActuationCommandStamped
 
-#from j6_interface_msgs.msg import T0Debug
-
 COUNTDOWN_TIME = 3  # [sec]
-TARGET_VELOCITY = 20.0  # [km/h]
+TARGET_VELOCITY = 42.5  # [km/h]
 TARGET_ACCELERATION_FOR_DRIVE = 1.5  # [m/s^2]
 TARGET_ACCELERATION_FOR_BRAKE = -1.5  # [m/s^2]
 TARGET_JERK_FOR_DRIVE = 1.5  # [m/s^3]
 TARGET_JERK_FOR_BRAKE = -1.5  # [m/s^3]
-TARGET_WEIGHT = 440  # [kg]
 
 MIN_ACCEL = -6.0
 MAX_ACCEL = 2.0
@@ -55,13 +50,7 @@ TOPIC_LIST_FOR_VALIDATION = [
 ]
 
 NODE_LIST_FOR_VALIDATION = [
-    #"/j6/j6_can_interface",
-    #"/j6/j6_interface",
-    #"/main/raw_vehicle_cmd_converter",
-    #"/sub/raw_vehicle_cmd_converter",
     "/raw_vehicle_cmd_converter"
-    #"/velocity_status_odometry_converter",
-    #"/imu/tamagawa/tag_can_driver",
 ]
 
 
@@ -75,11 +64,10 @@ class MapAccuracyTester(Node):
         while not self.client_control_mode.wait_for_service(timeout_sec=1.0):
             print("Waiting for the control mode service to become available...")
 
+        self.pub_data_collecting_control_cmd = self.create_publisher(Float32, "/data_collecting_accel_cmd", 1)
         self.pub_control_cmd = self.create_publisher(Control, "/control/command/control_cmd", 1)
         self.pub_gear_cmd = self.create_publisher(GearCommand, "/control/command/gear_cmd", 1)
-        #self.pub_t0_debug_cmd = self.create_publisher(
-            #T0Debug, "/j6/can/command/t0_debug_command", 1
-        #)
+
         self.sub_velocity_status = self.create_subscription(
             VelocityReport, "/vehicle/status/velocity_status", self.on_velocity_status, 1
         )
@@ -99,14 +87,12 @@ class MapAccuracyTester(Node):
         self.current_gear = GearReport.NONE
 
         # For commands reset
+        self.pub_data_collecting_pedal_input = self.create_publisher(
+            Float32, "/data_collecting_pedal_input", 1
+        )
         self.pub_actuation_cmd = self.create_publisher(
             ActuationCommandStamped, "/control/command/actuation_cmd", 1
         )
-
-        self.vehicle_id = "1"#os.getenv("VEHICLE_ID")
-        if not self.vehicle_id:
-            print("VEHICLE_ID is not set.")
-            sys.exit(1)
 
     def on_velocity_status(self, msg):
         self.current_velocity = msg.longitudinal_velocity
@@ -128,10 +114,6 @@ class MapAccuracyTester(Node):
         lib.system.check_service_active("autoware.service")
         lib.system.check_node_active(NODE_LIST_FOR_VALIDATION)
 
-        lib.cui.ready_check(
-            f"Ready to run the script?\nIs the vehicle weight adjusted to {TARGET_WEIGHT}kg?"
-        )
-
         print("===== Reset commands =====")
         lib.command.reset_commands(self)
 
@@ -140,9 +122,6 @@ class MapAccuracyTester(Node):
 
         print("===== Start checking brake map =====")
         lib.cui.do_check("Do you want to check brake map?", lambda: self.check("brake"))
-
-        print("===== Start checking sub brake map =====")
-        lib.cui.do_check("Do you want to check sub brake map?", lambda: self.check("sub_brake"))
 
         print("===== Successfully finished! =====")
 
@@ -161,10 +140,7 @@ class MapAccuracyTester(Node):
             lib.cui.countdown(COUNTDOWN_TIME)
             print(f"record rosbag: {filename}")
 
-            #print("===== Enter velocity only autonomous mode =====")
-            #lib.cui.ready_check("Ready to enter velocity only autonomous mode?")
             lib.cui.countdown(COUNTDOWN_TIME)
-            #lib.command.change_mode(self, "autonomous_velocity_only")
 
             if mode == "accel":
                 print(
@@ -192,21 +168,6 @@ class MapAccuracyTester(Node):
                     TARGET_JERK_FOR_DRIVE,
                 )
                 lib.command.accelerate(self, target_acceleration, 1e-3, "brake")
-            elif mode == "sub_brake":
-                print(
-                    f"===== Drive to {TARGET_VELOCITY} km/h and sub brake with {target_acceleration} ====="
-                )
-                lib.command.change_gear(self, "drive")
-                lib.cui.ready_check("Ready to drive?")
-                lib.cui.countdown(COUNTDOWN_TIME)
-                lib.command.accelerate(
-                    self,
-                    TARGET_ACCELERATION_FOR_DRIVE,
-                    TARGET_VELOCITY,
-                    "drive",
-                    TARGET_JERK_FOR_DRIVE,
-                )
-                lib.command.accelerate(self, target_acceleration, 1e-3, "brake", use_sub_brake=True)
             else:
                 print(f"Invalid mode: {mode}")
                 sys.exit(1)
@@ -237,8 +198,6 @@ class MapAccuracyTester(Node):
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
         filename = "_".join(
             [
-                self.vehicle_id,
-                str(TARGET_WEIGHT) + "kg",
                 "acceleration_accuracy",
                 mode,
                 str(target_acceleration),

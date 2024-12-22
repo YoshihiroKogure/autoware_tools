@@ -776,7 +776,7 @@ class Reversal_Loop_Circle(Base_Course):
         self.vel_hist = deque([float(0.0)] * 30, maxlen=30)  # Velocity history for smoothing.
         self.pedal_hist = deque([float(0.0)] * 30, maxlen=30)
         self.previous_updated_time = 0.0  # Timestamp for tracking updates.
-        
+
         # Initialize velocity and acceleration targets for trajectory segmentation.
         self.target_vel_on_segmentation = 6.0  # Target velocity.
         self.target_acc_on_segmentation = 0.0  # Target acceleration.
@@ -1157,23 +1157,38 @@ class Reversal_Loop_Circle(Base_Course):
         current_time,
         current_vel,
         collected_data_counts_of_vel_accel_pedal_input,
-        collected_data_counts_of_vel_brake_pedal_input
-    ):  
+        collected_data_counts_of_vel_brake_pedal_input,
+    ):
         max_velocity = self.params.collecting_data_max_v
-        if (self.trajectory_list[2].in_direction is not self.trajectory_list[2].out_direction) or (self.trajectory_list[1].in_direction is not self.trajectory_list[1].out_direction) or (
-            self.trajectory_list[2].in_direction is not self.trajectory_list[2].out_direction
+        if (
+            (self.trajectory_list[2].in_direction is not self.trajectory_list[2].out_direction)
+            or (self.trajectory_list[1].in_direction is not self.trajectory_list[1].out_direction)
+            or (self.trajectory_list[2].in_direction is not self.trajectory_list[2].out_direction)
         ):
             max_velocity = self.params.collecting_data_max_v / 2
 
-        
         # Initialize target acceleration and velocity if not already updated
         if not self.updated_target_velocity:
             # Choose velocity and acceleration bins based on collected data
-            self.accel_pedal_input_idx, self.vel_idx = self.choose_target_velocity_and_actuation_cmd( collected_data_counts_of_vel_accel_pedal_input )
-            self.brake_pedal_input_idx, self.vel_idx = self.choose_target_velocity_and_actuation_cmd( collected_data_counts_of_vel_brake_pedal_input )
-            self.target_accel_pedal_input_on_segmentation = self.params.accel_pedal_input_bin_centers[self.accel_pedal_input_idx]
-            self.target_brake_pedal_input_on_segmentation = self.params.brake_pedal_input_bin_centers[self.brake_pedal_input_idx]
-            
+            (
+                self.accel_pedal_input_idx,
+                self.vel_idx,
+            ) = self.choose_target_velocity_and_actuation_cmd(
+                collected_data_counts_of_vel_accel_pedal_input
+            )
+            (
+                self.brake_pedal_input_idx,
+                self.vel_idx,
+            ) = self.choose_target_velocity_and_actuation_cmd(
+                collected_data_counts_of_vel_brake_pedal_input
+            )
+            self.target_accel_pedal_input_on_segmentation = (
+                self.params.accel_pedal_input_bin_centers[self.accel_pedal_input_idx]
+            )
+            self.target_brake_pedal_input_on_segmentation = (
+                self.params.brake_pedal_input_bin_centers[self.brake_pedal_input_idx]
+            )
+
             # Set the vehicle's phase to "acceleration"
             self.vehicle_phase = "acceleration"
             self.updated_target_velocity = True
@@ -1185,7 +1200,7 @@ class Reversal_Loop_Circle(Base_Course):
         # Handle acceleration phase
         if self.vehicle_phase == "acceleration":
             target_pedal_input = self.target_accel_pedal_input_on_segmentation + 0.01 * sine**2
-            if current_time  - self.acceleration_start_time > 20.0:
+            if current_time - self.acceleration_start_time > 20.0:
                 target_pedal_input = 0.4
             if current_vel > max_velocity:
                 self.vehicle_phase = "deceleration"
@@ -1193,16 +1208,13 @@ class Reversal_Loop_Circle(Base_Course):
 
         # Handle deceleration phase
         if self.vehicle_phase == "deceleration":
-            target_pedal_input =  - self.target_brake_pedal_input_on_segmentation - 0.15 * sine**2
+            target_pedal_input = -self.target_brake_pedal_input_on_segmentation - 0.15 * sine**2
             # Reset velocity update flag when deceleration is complete
-            if (
-                current_vel
-                < 0.05 or current_time - self.deceleration_start_time > 25.0
-            ):
+            if current_vel < 0.05 or current_time - self.deceleration_start_time > 25.0:
                 self.updated_target_velocity = False
 
         return target_pedal_input
-        
+
     def update_trajectory_points(
         self,
         nearestIndex,
@@ -1251,7 +1263,6 @@ class Reversal_Loop_Circle(Base_Course):
                 elif self.params.control_mode == "actuation_cmd":
                     steer_of_trajectory = 1e-9  # Minimal steer value for turning initialization.
                     self.add_trajectory_for_turning(steer_of_trajectory)
-
 
         # Concatenate trajectory data from the trajectory list
         self.trajectory_points = np.concatenate(

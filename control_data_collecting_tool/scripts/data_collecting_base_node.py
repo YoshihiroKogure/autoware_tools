@@ -19,12 +19,12 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from autoware_adapi_v1_msgs.msg import OperationModeState
 from autoware_vehicle_msgs.msg import ControlModeReport
-from tier4_vehicle_msgs.msg import ActuationCommandStamped
 from geometry_msgs.msg import AccelWithCovarianceStamped
 from nav_msgs.msg import Odometry
 import numpy as np
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
+from tier4_vehicle_msgs.msg import ActuationCommandStamped
 
 
 class DataCollectingBaseNode(Node):
@@ -163,10 +163,7 @@ class DataCollectingBaseNode(Node):
             0.00,
         )
 
-        self.declare_parameter(
-            "NUM_BINS_ACCEL_PEDAL_INPUT",
-            4
-        )
+        self.declare_parameter("NUM_BINS_ACCEL_PEDAL_INPUT", 4)
 
         self.declare_parameter(
             "BRAKE_PEDAL_INPUT_MAX",
@@ -178,10 +175,7 @@ class DataCollectingBaseNode(Node):
             0.0,
         )
 
-        self.declare_parameter(
-            "NUM_BINS_BRAKE_PEDAL_INPUT",
-            8
-        )
+        self.declare_parameter("NUM_BINS_BRAKE_PEDAL_INPUT", 8)
 
         self.ego_point = np.array([0.0, 0.0])
         self.goal_point = np.array([0.0, 0.0])
@@ -320,21 +314,49 @@ class DataCollectingBaseNode(Node):
             mask_velocity_abs_steer_rate_path, self.num_bins_v, self.num_bins_abs_steer_rate
         )
 
-        self.accel_pedal_input_min = self.get_parameter("ACCEL_PEDAL_INPUT_MIN").get_parameter_value().double_value
-        self.accel_pedal_input_max = self.get_parameter("ACCEL_PEDAL_INPUT_MAX").get_parameter_value().double_value
+        self.accel_pedal_input_min = (
+            self.get_parameter("ACCEL_PEDAL_INPUT_MIN").get_parameter_value().double_value
+        )
+        self.accel_pedal_input_max = (
+            self.get_parameter("ACCEL_PEDAL_INPUT_MAX").get_parameter_value().double_value
+        )
 
-        self.num_bins_accel_pedal_input = self.get_parameter("NUM_BINS_ACCEL_PEDAL_INPUT").get_parameter_value().integer_value
-        self.accel_pedal_input_bins = np.linspace(self.accel_pedal_input_min, self.accel_pedal_input_max, self.num_bins_accel_pedal_input+1)
-        self.accel_pedal_input_bin_centers = (self.accel_pedal_input_bins[:-1] + self.accel_pedal_input_bins[1:]) / 2
-        self.collected_data_counts_of_vel_accel_pedal_input = np.zeros((self.num_bins_v, self.num_bins_accel_pedal_input), dtype=np.int32)
+        self.num_bins_accel_pedal_input = (
+            self.get_parameter("NUM_BINS_ACCEL_PEDAL_INPUT").get_parameter_value().integer_value
+        )
+        self.accel_pedal_input_bins = np.linspace(
+            self.accel_pedal_input_min,
+            self.accel_pedal_input_max,
+            self.num_bins_accel_pedal_input + 1,
+        )
+        self.accel_pedal_input_bin_centers = (
+            self.accel_pedal_input_bins[:-1] + self.accel_pedal_input_bins[1:]
+        ) / 2
+        self.collected_data_counts_of_vel_accel_pedal_input = np.zeros(
+            (self.num_bins_v, self.num_bins_accel_pedal_input), dtype=np.int32
+        )
 
-        self.brake_pedal_input_min = self.get_parameter("BRAKE_PEDAL_INPUT_MIN").get_parameter_value().double_value
-        self.brake_pedal_input_max = self.get_parameter("BRAKE_PEDAL_INPUT_MAX").get_parameter_value().double_value
+        self.brake_pedal_input_min = (
+            self.get_parameter("BRAKE_PEDAL_INPUT_MIN").get_parameter_value().double_value
+        )
+        self.brake_pedal_input_max = (
+            self.get_parameter("BRAKE_PEDAL_INPUT_MAX").get_parameter_value().double_value
+        )
 
-        self.num_bins_brake_pedal_input = self.get_parameter("NUM_BINS_BRAKE_PEDAL_INPUT").get_parameter_value().integer_value
-        self.brake_pedal_input_bins = np.linspace(self.brake_pedal_input_min, self.brake_pedal_input_max, self.num_bins_brake_pedal_input+1)
-        self.brake_pedal_input_bin_centers = (self.brake_pedal_input_bins[:-1] + self.brake_pedal_input_bins[1:]) / 2
-        self.collected_data_counts_of_vel_brake_pedal_input = np.zeros((self.num_bins_v, self.num_bins_brake_pedal_input), dtype=np.int32)
+        self.num_bins_brake_pedal_input = (
+            self.get_parameter("NUM_BINS_BRAKE_PEDAL_INPUT").get_parameter_value().integer_value
+        )
+        self.brake_pedal_input_bins = np.linspace(
+            self.brake_pedal_input_min,
+            self.brake_pedal_input_max,
+            self.num_bins_brake_pedal_input + 1,
+        )
+        self.brake_pedal_input_bin_centers = (
+            self.brake_pedal_input_bins[:-1] + self.brake_pedal_input_bins[1:]
+        ) / 2
+        self.collected_data_counts_of_vel_brake_pedal_input = np.zeros(
+            (self.num_bins_v, self.num_bins_brake_pedal_input), dtype=np.int32
+        )
 
     def onOdometry(self, msg):
         self._present_kinematic_state = msg
@@ -353,7 +375,7 @@ class DataCollectingBaseNode(Node):
 
     def subscribe_control_mode(self, msg):
         self._present_control_mode_ = msg.mode
-        
+
     def subscribe_actuate_cmd(self, msg):
         self._present_actuation_cmd = msg
 

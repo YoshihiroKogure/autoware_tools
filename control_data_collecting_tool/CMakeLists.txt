@@ -42,6 +42,11 @@ install(PROGRAMS
   scripts/data_collecting_rosbag_record.py
   scripts/data_collecting_data_counter.py
   scripts/data_collecting_base_node.py
+  scripts/calibration/control_data_actuation_cmd.py
+  scripts/calibration/control_data_control_cmd.py
+  scripts/calibration/accel_brake_map_generator.py
+  scripts/calibration/modify_map.py
+  scripts/calibration/map_accuracy_checker.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

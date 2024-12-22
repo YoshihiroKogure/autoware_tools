@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from accel_brake_map import AccelBrakeMapConverter
 from autoware_adapi_v1_msgs.msg import OperationModeState
 from autoware_control_msgs.msg import Control as AckermannControlCommand
 from autoware_planning_msgs.msg import Trajectory
@@ -21,7 +22,6 @@ from autoware_vehicle_msgs.msg import GearCommand
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 import numpy as np
-from accel_brake_map import AccelBrakeMapConverter
 from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
 from rclpy.node import Node
@@ -36,7 +36,8 @@ if debug_matplotlib_plot_flag:
     import matplotlib.pyplot as plt
 
     plt.rcParams["figure.figsize"] = [8, 8]
-    
+
+
 def getYaw(orientation_xyzw):
     return R.from_quat(orientation_xyzw.reshape(-1, 4)).as_euler("xyz")[:, 2]
 
@@ -45,15 +46,17 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
     def __init__(self):
         super().__init__("data_collecting_pure_pursuit_trajectory_follower_actuation_cmd")
 
+        # common params
         self.declare_parameter(
-            "accel_map_path",
-            ""
+            "CONTROL_MODE",
+            "accel_input",
         )
+        # set control mode
+        self.CONTROL_MODE = self.get_parameter("CONTROL_MODE").value
 
-        self.declare_parameter(
-            "brake_map_path",
-            ""
-        )
+        self.declare_parameter("accel_map_path", "")
+
+        self.declare_parameter("brake_map_path", "")
 
         self.declare_parameter(
             "pure_pursuit_type",
@@ -200,6 +203,13 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
         )
         self.sub_pedal_input_
 
+        self.sub_accel_input_ = self.create_subscription(
+            Float32,
+            "/data_collecting_accel_cmd",
+            self.onAccelCmd,
+            1,
+        )
+
         self.sub_operation_mode_ = self.create_subscription(
             OperationModeState,
             "/system/operation_mode/state",
@@ -233,7 +243,7 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
             "/data_collecting_lookahead_marker_array",
             1,
         )
-        
+
         path_to_accel_map = self.get_parameter("accel_map_path").get_parameter_value().string_value
         path_to_brake_map = self.get_parameter("brake_map_path").get_parameter_value().string_value
         self.accel_brake_map = AccelBrakeMapConverter(path_to_accel_map, path_to_brake_map)
@@ -244,6 +254,7 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
         self._present_kinematic_state = None
         self._present_trajectory = None
         self._present_operation_mode = None
+        self.accel_cmd = None
         self.pedal_input = None
         self.stop_request = False
         self._previous_cmd = np.zeros(2)
@@ -263,6 +274,9 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
 
     def onPedalInput(self, msg):
         self.pedal_input = msg.data
+
+    def onAccelCmd(self, msg):
+        self.accel_cmd = msg.data
 
     def onOperationMode(self, msg):
         self._present_operation_mode = msg
@@ -285,9 +299,9 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
     ):
         # naive pure pursuit steering control law
         wheel_base = self.get_parameter("wheel_base").get_parameter_value().double_value
-        #acc_kp = self.get_parameter("acc_kp").get_parameter_value().double_value
-        #longitudinal_vel_err = longitudinal_vel_obs - longitudinal_vel_ref_nearest
-        #ure_pursuit_acc_cmd = -acc_kp * longitudinal_vel_err
+        # acc_kp = self.get_parameter("acc_kp").get_parameter_value().double_value
+        # longitudinal_vel_err = longitudinal_vel_obs - longitudinal_vel_ref_nearest
+        # ure_pursuit_acc_cmd = -acc_kp * longitudinal_vel_err
 
         alpha = (
             np.arctan2(pos_xy_ref_target[1] - pos_xy_obs[1], pos_xy_ref_target[0] - pos_xy_obs[0])
@@ -309,7 +323,7 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
     ):
         # control law equal to simple_trajectory_follower in autoware
         wheel_base = self.get_parameter("wheel_base").get_parameter_value().double_value
-        #acc_kp = self.get_parameter("acc_kp").get_parameter_value().double_value
+        # acc_kp = self.get_parameter("acc_kp").get_parameter_value().double_value
 
         # Currently, the following params are not declared as ROS 2 params.
         lookahead_coef = self.get_parameter("lookahead_time").get_parameter_value().double_value
@@ -326,8 +340,8 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
             .double_value
         )
 
-        #longitudinal_vel_err = longitudinal_vel_obs - longitudinal_vel_ref_nearest
-        #pure_pursuit_acc_cmd = -acc_kp * longitudinal_vel_err
+        # longitudinal_vel_err = longitudinal_vel_obs - longitudinal_vel_ref_nearest
+        # pure_pursuit_acc_cmd = -acc_kp * longitudinal_vel_err
 
         cos_yaw = np.cos(pos_yaw_ref_nearest)
         sin_yaw = np.sin(pos_yaw_ref_nearest)
@@ -354,7 +368,7 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
         pure_pursuit_steer_cmd = (
             -linearized_pure_pursuit_steer_kp * lat_err - linearized_pure_pursuit_steer_kd * yaw_err
         )
-        return pure_pursuit_steer_cmd #np.array([pure_pursuit_acc_cmd, pure_pursuit_steer_cmd])
+        return pure_pursuit_steer_cmd  # np.array([pure_pursuit_acc_cmd, pure_pursuit_steer_cmd])
 
     def control(self):
         # [0] receive topic
@@ -478,10 +492,9 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
             self.get_parameter("pure_pursuit_type").get_parameter_value().string_value
         )
 
-        actuation_cmd_without_limit = np.zeros(2)
+        steer_cmd_without_limit = 0.0
         if pure_pursuit_type == "naive":
-            actuation_cmd_without_limit[0] = self.pedal_input
-            actuation_cmd_without_limit[1] = self.pure_pursuit_steer_control(
+            steer_cmd_without_limit = self.pure_pursuit_steer_control(
                 present_position[:2],
                 present_yaw,
                 present_linear_velocity[0],
@@ -489,8 +502,7 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
                 trajectory_longitudinal_velocity[nearestIndex],
             )
         elif pure_pursuit_type == "linearized":
-            actuation_cmd_without_limit[0] = self.pedal_input
-            actuation_cmd_without_limit[1] = self.linearized_pure_pursuit_steer_control(
+            steer_cmd_without_limit = self.linearized_pure_pursuit_steer_control(
                 present_position[:2],
                 present_yaw,
                 present_linear_velocity[0],
@@ -504,10 +516,21 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
                 % pure_pursuit_type
             )
 
-        accel_input = self.accel_brake_map.convert_actuation_cmd_to_accel_input(actuation_cmd_without_limit[0], present_linear_velocity[0])
+        accel_input = 0.0
+        self.get_logger().info(str(self.pedal_input))
+        if self.CONTROL_MODE == "actuation_cmd" or self.CONTROL_MODE == "external_actuation_cmd":
+            if self.pedal_input is not None:
+                accel_input = self.accel_brake_map.convert_actuation_cmd_to_accel_input(
+                    self.pedal_input, present_linear_velocity[0]
+                )
+
+        if self.CONTROL_MODE == "external_accel_input":
+            if self.accel_cmd is not None:
+                accel_input = self.accel_cmd
+
         cmd = np.zeros(2)
         cmd[0] = accel_input
-        cmd[1] = actuation_cmd_without_limit[1]
+        cmd[1] = steer_cmd_without_limit
         cmd_without_noise = 1 * cmd
 
         tmp_acc_noise = self.acc_noise_list.pop(0)
@@ -651,7 +674,9 @@ class DataCollectingPurePursuitTrajectoryFollowerActuationCmd(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    data_collecting_pure_pursuit_trajectory_follower_actuation_cmd = DataCollectingPurePursuitTrajectoryFollowerActuationCmd()
+    data_collecting_pure_pursuit_trajectory_follower_actuation_cmd = (
+        DataCollectingPurePursuitTrajectoryFollowerActuationCmd()
+    )
 
     rclpy.spin(data_collecting_pure_pursuit_trajectory_follower_actuation_cmd)
 

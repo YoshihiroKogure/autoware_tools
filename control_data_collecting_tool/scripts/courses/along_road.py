@@ -137,7 +137,7 @@ class Along_Road(Base_Course):
             False  # Indicates whether the target velocity has been updated.
         )
 
-        self.collect_pedal_data = "accel" #or "brake"
+        self.collect_pedal_data = "accel"  # or "brake"
 
     def get_trajectory_points(
         self,
@@ -340,48 +340,77 @@ class Along_Road(Base_Course):
 
         return target_vel
 
-    
     def get_target_pedal_input(
         self,
         nearestIndex,
         current_time,
         current_vel,
         collected_data_counts_of_vel_accel_pedal_input,
-        collected_data_counts_of_vel_brake_pedal_input
-    ):  
-        
+        collected_data_counts_of_vel_brake_pedal_input,
+    ):
         if nearestIndex <= 0.05 * len(self.trajectory_points):
             self.updated_target_velocity = False
 
         # Initialize target acceleration and velocity if not already updated
         if not self.updated_target_velocity:
             # Choose velocity and acceleration bins based on collected data
-            self.accel_pedal_input_idx, self.vel_idx = self.choose_target_velocity_and_actuation_cmd( collected_data_counts_of_vel_accel_pedal_input )
-            self.brake_pedal_input_idx, self.vel_idx = self.choose_target_velocity_and_actuation_cmd( collected_data_counts_of_vel_brake_pedal_input )
+            (
+                self.accel_pedal_input_idx,
+                self.vel_idx,
+            ) = self.choose_target_velocity_and_actuation_cmd(
+                collected_data_counts_of_vel_accel_pedal_input
+            )
+            (
+                self.brake_pedal_input_idx,
+                self.vel_idx,
+            ) = self.choose_target_velocity_and_actuation_cmd(
+                collected_data_counts_of_vel_brake_pedal_input
+            )
 
-            if collected_data_counts_of_vel_accel_pedal_input[self.vel_idx, self.accel_pedal_input_idx] <= collected_data_counts_of_vel_brake_pedal_input[self.vel_idx, self.brake_pedal_input_idx]:
+            if (
+                collected_data_counts_of_vel_accel_pedal_input[
+                    self.vel_idx, self.accel_pedal_input_idx
+                ]
+                <= collected_data_counts_of_vel_brake_pedal_input[
+                    self.vel_idx, self.brake_pedal_input_idx
+                ]
+            ):
                 self.collect_pedal_data = "accel"
-            elif collected_data_counts_of_vel_accel_pedal_input[self.vel_idx, self.accel_pedal_input_idx] > collected_data_counts_of_vel_brake_pedal_input[self.vel_idx, self.brake_pedal_input_idx]:
+            elif (
+                collected_data_counts_of_vel_accel_pedal_input[
+                    self.vel_idx, self.accel_pedal_input_idx
+                ]
+                > collected_data_counts_of_vel_brake_pedal_input[
+                    self.vel_idx, self.brake_pedal_input_idx
+                ]
+            ):
                 self.collect_pedal_data = "brake"
 
             self.target_vel_on_segmentation = self.params.v_bin_centers[self.vel_idx]
-            self.target_accel_pedal_input_on_segmentation = self.params.accel_pedal_input_bin_centers[self.accel_pedal_input_idx]
-            self.target_brake_pedal_input_on_segmentation = self.params.brake_pedal_input_bin_centers[self.brake_pedal_input_idx]
-            
+            self.target_accel_pedal_input_on_segmentation = (
+                self.params.accel_pedal_input_bin_centers[self.accel_pedal_input_idx]
+            )
+            self.target_brake_pedal_input_on_segmentation = (
+                self.params.brake_pedal_input_bin_centers[self.brake_pedal_input_idx]
+            )
+
             # Set the vehicle's phase to "acceleration"
             self.vehicle_phase = "acceleration"
             self.updated_target_velocity = True
             self.acceleration_start_time = current_time
-        
-        max_velocity = self.params.collecting_data_max_v#self.target_vel_on_segmentation
+
+        max_velocity = self.params.collecting_data_max_v  # self.target_vel_on_segmentation
 
         T = 7.5  # Period of the sine wave used to modulate velocity
         sine = np.sin(2 * np.pi * current_time / T)  # Sine wave for smooth velocity modulation
 
         # Handle acceleration phase
         if self.vehicle_phase == "acceleration":
-            target_pedal_input =  self.target_accel_pedal_input_on_segmentation
-            if current_vel < self.params.collecting_data_min_v or self.collect_pedal_data == "brake":
+            target_pedal_input = self.target_accel_pedal_input_on_segmentation
+            if (
+                current_vel < self.params.collecting_data_min_v
+                or self.collect_pedal_data == "brake"
+            ):
                 target_pedal_input = 0.40
             if current_vel > max_velocity:
                 self.vehicle_phase = "deceleration"
@@ -389,13 +418,13 @@ class Along_Road(Base_Course):
 
         # Handle deceleration phase
         if self.vehicle_phase == "deceleration":
-            target_pedal_input = -self.target_brake_pedal_input_on_segmentation - 0.025 * sine**2
+            target_pedal_input = - self.target_brake_pedal_input_on_segmentation - 0.025 * sine**2
 
-        if nearestIndex > len(self.trajectory_points) - int( self.stopping_distance / self.step ):
+        if nearestIndex > len(self.trajectory_points) - int(self.stopping_distance / self.step):
             target_pedal_input = -0.6
 
         return target_pedal_input
-    
+
     def return_trajectory_points(self, yaw, translation):
         # no coordinate transformation is needed
         return self.trajectory_points, self.yaw, self.curvature, self.parts, self.achievement_rates

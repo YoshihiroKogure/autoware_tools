@@ -21,7 +21,7 @@ from rclpy.serialization import deserialize_message
 import rosbag2_py
 from rosidl_runtime_py.utilities import get_message
 
-TOPIC_LIST = "/control/(.*)|/vehicle/(.*)|/j6/(.*)|/imu/(.*)|/sensing/imu/(.*)"
+TOPIC_LIST = "/control/(.*)|/vehicle/(.*)|/imu/(.*)|/sensing/imu/(.*)"
 
 
 def record_ros2_bag(bag_name, topic_list):

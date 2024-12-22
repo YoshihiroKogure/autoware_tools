@@ -43,7 +43,7 @@ def getYaw(orientation_xyzw):
 class DataCollectingPurePursuitTrajectoryFollowerAccelInput(Node):
     def __init__(self):
         super().__init__("data_collecting_pure_pursuit_trajectory_follower_accel_input")
-        
+
         self.declare_parameter(
             "pure_pursuit_type",
             "linearized",
@@ -618,7 +618,9 @@ class DataCollectingPurePursuitTrajectoryFollowerAccelInput(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    data_collecting_pure_pursuit_trajectory_follower_accel_input = DataCollectingPurePursuitTrajectoryFollowerAccelInput()
+    data_collecting_pure_pursuit_trajectory_follower_accel_input = (
+        DataCollectingPurePursuitTrajectoryFollowerAccelInput()
+    )
 
     rclpy.spin(data_collecting_pure_pursuit_trajectory_follower_accel_input)
 

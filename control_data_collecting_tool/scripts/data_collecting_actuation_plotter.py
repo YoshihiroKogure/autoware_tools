@@ -38,38 +38,45 @@ class DataCollectingPlotter(DataCollectingBaseNode):
 
         self.fig, self.axs = plt.subplots(2, 1, figsize=(12, 24))
         plt.ion()
-        self.collected_data_counts_of_vel_accel_pedal_input_subscription_ = self.create_subscription(
-            Int32MultiArray,
-            "/control_data_collecting_tools/collected_data_counts_of_vel_accel_pedal_input",
-            self.subscribe_collected_data_counts_of_vel_accel_pedal_input,
-            10,
+        self.collected_data_counts_of_vel_accel_pedal_input_subscription_ = (
+            self.create_subscription(
+                Int32MultiArray,
+                "/control_data_collecting_tools/collected_data_counts_of_vel_accel_pedal_input",
+                self.subscribe_collected_data_counts_of_vel_accel_pedal_input,
+                10,
+            )
         )
         self.collected_data_counts_of_vel_accel_pedal_input_subscription_
 
-        self.collected_data_counts_of_vel_brake_pedal_input_subscription_ = self.create_subscription(
-            Int32MultiArray,
-            "/control_data_collecting_tools/collected_data_counts_of_vel_brake_pedal_input",
-            self.subscribe_collected_data_counts_of_vel_brake_pedal_input,
-            10,
+        self.collected_data_counts_of_vel_brake_pedal_input_subscription_ = (
+            self.create_subscription(
+                Int32MultiArray,
+                "/control_data_collecting_tools/collected_data_counts_of_vel_brake_pedal_input",
+                self.subscribe_collected_data_counts_of_vel_brake_pedal_input,
+                10,
+            )
         )
         self.collected_data_counts_of_vel_brake_pedal_input_subscription_
 
     def subscribe_collected_data_counts_of_vel_accel_pedal_input(self, msg):
         rows = msg.layout.dim[0].size
         cols = msg.layout.dim[1].size
-        self.collected_data_counts_of_vel_accel_pedal_input = np.array(msg.data).reshape((rows, cols))
+        self.collected_data_counts_of_vel_accel_pedal_input = np.array(msg.data).reshape(
+            (rows, cols)
+        )
 
     def subscribe_collected_data_counts_of_vel_brake_pedal_input(self, msg):
         rows = msg.layout.dim[0].size
         cols = msg.layout.dim[1].size
-        self.collected_data_counts_of_vel_brake_pedal_input = np.array(msg.data).reshape((rows, cols))
+        self.collected_data_counts_of_vel_brake_pedal_input = np.array(msg.data).reshape(
+            (rows, cols)
+        )
 
     def timer_callback_plotter(self):
         self.plot_data_collection_grid()
         plt.pause(0.1)
 
     def plot_data_collection_grid(self):
-
         # update collected acceleration and velocity grid
         for collection in self.axs[0].collections:
             if collection.colorbar is not None:
@@ -81,7 +88,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
             annot=True,
             cmap="coolwarm",
             xticklabels=np.round(self.v_bin_centers, 2),
-            yticklabels=np.round(self.accel_pedal_input_bin_centers , 3),
+            yticklabels=np.round(self.accel_pedal_input_bin_centers, 3),
             ax=self.axs[0],
             linewidths=0.1,
             linecolor="gray",
@@ -100,7 +107,7 @@ class DataCollectingPlotter(DataCollectingBaseNode):
             annot=True,
             cmap="coolwarm",
             xticklabels=np.round(self.v_bin_centers, 2),
-            yticklabels=np.round(self.brake_pedal_input_bin_centers , 3),
+            yticklabels=np.round(self.brake_pedal_input_bin_centers, 3),
             ax=self.axs[1],
             linewidths=0.1,
             linecolor="gray",
