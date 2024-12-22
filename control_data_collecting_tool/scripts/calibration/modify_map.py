@@ -98,11 +98,10 @@ def compute_col_neighbors_average(matrix):
 
 def main():
     parser = argparse.ArgumentParser(description="Accel and brake map generator")
-    parser.add_argument("map_ath", help="path to map")
+    parser.add_argument("map_path", help="path to map")
     args = parser.parse_args()
     accel_map_ = pd.read_csv(args.map_path + "/accel_map.csv", delimiter=",", header=0)
     accel_map = accel_map_.to_numpy()[:,1:]
-    accel_map
 
     brake_map_ = pd.read_csv(args.map_path + "/brake_map.csv", delimiter=",", header=0)
     brake_map = brake_map_.to_numpy()[:,1:]
@@ -130,11 +129,21 @@ def main():
         map_ = compute_col_neighbors_average(map_)
     map_ = optimize_brake(map_)
 
-    modified_accel_map = map_[:accel_m, :]
-    modified_brake_map = map_[accel_m-1:, :]
+    modified_accel_map_ = map_[:accel_m, :][::-1,:]
+    modified_accel_map = np.zeros((len(modified_accel_map_)+1, len(modified_accel_map_[0])+1))
+    modified_accel_map[1:,1:] = modified_accel_map_
+    modified_accel_map[0,1:] = np.array([np.round(i*1.39,2) for i in range(len(modified_accel_map_[0]))])
+    modified_accel_map[1:,0] = accel_map_.to_numpy()[:,0]
 
-    np.savetxt(args.map_path + "/modified_accel_map.csv", modified_accel_map[::-1,:],delimiter=",")
-    np.savetxt(args.map_path + "/modified_brake_map.csv", modified_brake_map,delimiter=",")
+
+    modified_brake_map_ = map_[accel_m-1:, :]
+    modified_brake_map = np.zeros((len(modified_brake_map_)+1, len(modified_brake_map_[0])+1))
+    modified_brake_map[1:,1:] = modified_brake_map_
+    modified_brake_map[0,1:] = np.array([np.round(i*1.39,2) for i in range(len(modified_brake_map_[0]))])
+    modified_brake_map[1:,0] = brake_map_.to_numpy()[:,0]
+
+    np.savetxt(args.map_path + "/modified_accel_map.csv", modified_accel_map, delimiter=",")
+    np.savetxt(args.map_path + "/modified_brake_map.csv", modified_brake_map, delimiter=",")
 
 
 if __name__ == "__main__":

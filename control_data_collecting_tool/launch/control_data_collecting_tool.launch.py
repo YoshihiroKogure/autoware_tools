@@ -34,6 +34,7 @@ def get_course_name(yaml_file_path):
     course_name = data.get("/**", {}).get("ros__parameters", {}).get("COURSE_NAME", None)
     return course_name
 
+
 def get_control_mode(yaml_file_path):
     with open(yaml_file_path, "r") as file:
         data = yaml.safe_load(file)
@@ -65,7 +66,7 @@ def generate_launch_description():
 
     # Get the control mode
     control_mode = get_control_mode(common_param_file_path)
-    
+
     if control_mode == "accel_input":
         return launch.LaunchDescription(
             [
@@ -105,7 +106,12 @@ def generate_launch_description():
                 ),
             ]
         )
-    elif control_mode == "actuation_cmd":
+
+    elif (
+        control_mode == "actuation_cmd"
+        or control_mode == "external_actuation_cmd"
+        or control_mode == "external_accel_input"
+    ):
         return launch.LaunchDescription(
             [
                 map_path_arg,
@@ -143,7 +149,7 @@ def generate_launch_description():
                     parameters=[common_param_file_path],
                 ),
             ]
-        ) 
+        )
 
 
 if __name__ == "__main__":
