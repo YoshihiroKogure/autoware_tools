@@ -33,7 +33,7 @@ from rclpy.node import Node
 from tier4_vehicle_msgs.msg import ActuationCommandStamped
 
 COUNTDOWN_TIME = 3  # [sec]
-TARGET_VELOCITY = 42.5  # [km/h]
+TARGET_VELOCITY = 42.5 / 4  # [km/h]
 TARGET_ACTUATION_FOR_ACCEL = 0.3
 TARGET_ACTUATION_FOR_BRAKE = 0.5 
 TARGET_JERK_FOR_DRIVE = 1.5  # [m/s^3]
