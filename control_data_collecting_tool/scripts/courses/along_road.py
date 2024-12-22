@@ -340,6 +340,7 @@ class Along_Road(Base_Course):
 
         return target_vel
 
+    '''
     def get_target_pedal_input(
         self,
         nearestIndex,
@@ -420,10 +421,11 @@ class Along_Road(Base_Course):
         if self.vehicle_phase == "deceleration":
             target_pedal_input = - self.target_brake_pedal_input_on_segmentation - 0.025 * sine**2
 
-        if nearestIndex > len(self.trajectory_points) - int(self.stopping_distance / self.step):
+        if nearestIndex > len(self.trajectory_points) - 2.0 * int(self.stopping_distance / self.step):
             target_pedal_input = -0.6
 
         return target_pedal_input
+    '''
 
     def return_trajectory_points(self, yaw, translation):
         # no coordinate transformation is needed

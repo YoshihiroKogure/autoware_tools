@@ -1,6 +1,6 @@
 /**:
   ros__parameters:
-    CONTROL_MODE: external_actuation_cmd # accel_input, actuation_cmd, external_accel_input, external_actuation_cmd
+    CONTROL_MODE: accel_input # accel_input, actuation_cmd, external_accel_input, external_actuation_cmd
     LOAD_ROSBAG2_FILES: false
     accel_map_path: /home/kogure/pilot-auto.xx1/src/autoware/universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/accel_map.csv
     brake_map_path: /home/kogure/pilot-auto.xx1/src/autoware/universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/brake_map.csv
@@ -17,8 +17,8 @@
     NUM_BINS_A: 10
     NUM_BINS_ABS_STEER_RATE: 5
     NUM_BINS_JERK: 10
-    NUM_BINS_ACCEL_PEDAL_INPUT: 3
-    NUM_BINS_BRAKE_PEDAL_INPUT: 4
+    NUM_BINS_ACCEL_PEDAL_INPUT: 8
+    NUM_BINS_BRAKE_PEDAL_INPUT: 12
     V_MIN: 0.0
     V_MAX: 11.5
     STEER_MIN: -0.6
@@ -31,7 +31,7 @@
     JERK_MAX: 0.5
     ACCEL_PEDAL_INPUT_MAX: 0.4
     ACCEL_PEDAL_INPUT_MIN: 0.01
-    BRAKE_PEDAL_INPUT_MAX: 0.4
+    BRAKE_PEDAL_INPUT_MAX: 0.54
     BRAKE_PEDAL_INPUT_MIN: 0.0
 
     MASK_NAME: default

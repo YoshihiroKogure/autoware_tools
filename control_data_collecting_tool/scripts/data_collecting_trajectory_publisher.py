@@ -686,7 +686,7 @@ class DataCollectingTrajectoryPublisher(DataCollectingBaseNode):
             # [6] publish
 
             # [6-1] publish pedal input
-            if self.CONTROL_MODE == "accel_input":
+            if self.CONTROL_MODE == "actuation_cmd":
                 self.pedal_input_pub_.publish(Float32(data=float(target_pedal_input)))
 
             # [6-2] publish trajectory
