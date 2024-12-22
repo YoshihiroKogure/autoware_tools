@@ -2,7 +2,7 @@
   ros__parameters:
     # Course Specific Parameters
     velocity_on_curve: 3.5
-    stopping_distance: 20.0
+    stopping_distance: 30.0
     course_width: 1.5
     smoothing_window: 100
     length_of_straight_line: 50.0
