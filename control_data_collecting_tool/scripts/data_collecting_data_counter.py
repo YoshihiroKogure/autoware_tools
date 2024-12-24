@@ -312,8 +312,8 @@ class DataCollectingDataCounter(DataCollectingBaseNode):
                 self.count_observations(
                     current_vel, current_acc, current_steer, current_steer_rate, current_jerk
                 )
-
-                self.count_pedal_input_observation(pedal_input, current_vel)
+                if abs(current_steer) < 0.2:
+                    self.count_pedal_input_observation(pedal_input, current_vel)
 
                 self.acc_hist.append(float(current_acc))
                 self.vel_hist.append(float(current_vel))

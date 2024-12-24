@@ -27,12 +27,13 @@ from rclpy.serialization import deserialize_message
 import rosbag2_py
 from rosidl_runtime_py.utilities import get_message
 
-MAP_AXIS_VELOCITY_KPH = [0, 5, 10, 15, 20, 25, 30, 35]
+MAP_AXIS_VELOCITY_KPH = [0, 5, 10, 15, 20, 25, 30, 35, 40]
 MIN_VELOCITY_FOR_CALC_ACCEL_KPH = 3
 TOPIC_NAMES = [
     "/vehicle/status/velocity_status",
     "/control/command/actuation_cmd",
-    "/sensing/imu/imu_data",
+    #"/sensing/imu/imu_data",
+    "/sensing/imu/tamagawa/imu_raw",
     "/vehicle/status/control_mode",
 ]
 VELOCITY_MARGIN_KPH = 0.1
@@ -96,9 +97,9 @@ def get_auto_driving_mode_stamps(topics):
 
     for control_mode_msg in topics["/vehicle/status/control_mode"]:
         if control_mode_msg.mode != ControlModeReport.MANUAL and not is_auto_driving:
-            if stamp_auto_driving_start != 0:
-                print("===== error!: driving auto twice in one rosbag =====")
-                sys.exit()
+            #if stamp_auto_driving_start != 0:
+                #print("===== error!: driving auto twice in one rosbag =====")
+                #sys.exit()
             stamp_auto_driving_start = (
                 control_mode_msg.stamp.sec + control_mode_msg.stamp.nanosec * 1e-9
             )
@@ -231,6 +232,8 @@ class MapGenerator:
             self.calc_acceleration(topics, "brake")
 
     def calc_acceleration(self, topics, actuation_type):
+        print("self.velocity_for_calculating_acceleration")
+        print(self.velocity_for_calculating_acceleration )
         print("===== calc acceleration =====")
 
         # Obtain timestamps during autonomous driving mode
@@ -278,6 +281,8 @@ class MapGenerator:
 
         # Update accel/brake map
         if actuation_type == "accel":
+            pprint.pprint("self.accel_accelerations")
+            pprint.pprint(self.accel_accelerations)
             if actuation_cmd in self.accel_accelerations:
                 for i in range(len(accelerations)):
                     if self.accel_accelerations[actuation_cmd][i] == 0:
@@ -291,6 +296,8 @@ class MapGenerator:
             else:
                 self.accel_accelerations[actuation_cmd] = accelerations
         if actuation_type == "brake":
+            pprint.pprint("self.brake_accelerations")
+            pprint.pprint(self.brake_accelerations)
             if actuation_cmd in self.brake_accelerations:
                 for i in range(len(accelerations)):
                     if self.brake_accelerations[actuation_cmd][i] == 0:
@@ -322,7 +329,7 @@ class MapGenerator:
             writer.writerow(header)
 
             for actuation_cmd, accelerations in self.accel_accelerations.items():
-                accelerations = [round(acceleration, 2) for acceleration in accelerations]
+                accelerations = [round(acceleration, 4) for acceleration in accelerations]
                 row = [actuation_cmd] + [accelerations[0]] + accelerations
                 writer.writerow(row)
 
@@ -336,7 +343,7 @@ class MapGenerator:
             writer.writerow(header)
 
             for actuation_cmd, accelerations in self.brake_accelerations.items():
-                accelerations = [round(acceleration, 2) for acceleration in accelerations]
+                accelerations = [round(acceleration, 4) for acceleration in accelerations]
                 row = [actuation_cmd] + [accelerations[0]] + accelerations
                 writer.writerow(row)
 
@@ -362,6 +369,9 @@ class AccelerationAccuracyChecker:
             self.calc_acceleration(topics)
 
     def calc_acceleration(self, topics):
+        
+        print("self.velocity_for_calculating_acceleration")
+        print(self.velocity_for_calculating_acceleration )
         print("===== calc acceleration =====")
 
         # Obtain timestamps during autonomous driving mode

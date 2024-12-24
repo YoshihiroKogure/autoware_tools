@@ -1193,24 +1193,24 @@ class Reversal_Loop_Circle(Base_Course):
             self.updated_target_velocity = True
             self.acceleration_start_time = current_time
 
-        T = 10.0  # Period of the sine wave used to modulate velocity
+        T = 20.0  # Period of the sine wave used to modulate velocity
         sine = np.sin(2 * np.pi * current_time / T)  # Sine wave for smooth velocity modulation
 
         # Handle acceleration phase
         if self.vehicle_phase == "acceleration":
-            target_pedal_input = self.target_accel_pedal_input_on_segmentation
-            if current_time - self.acceleration_start_time > 40.0:
-                target_pedal_input = 0.4 * sine**2
+            target_pedal_input = self.target_accel_pedal_input_on_segmentation + 0.1 * sine**2
+            if current_time - self.acceleration_start_time > 20.0:
+                target_pedal_input = 0.3 * sine**2
             if current_vel > max_velocity:
                 self.vehicle_phase = "deceleration"
                 self.deceleration_start_time = current_time
 
         # Handle deceleration phase
         if self.vehicle_phase == "deceleration":
-            target_pedal_input = -self.target_brake_pedal_input_on_segmentation
+            target_pedal_input = - self.target_brake_pedal_input_on_segmentation - 0.1 * sine**2
             # Reset velocity update flag when deceleration is complete
             if current_time - self.deceleration_start_time > 40.0:
-                target_pedal_input = -0.5
+                target_pedal_input = -0.4 * sine**2
             if current_vel < 0.05:
                 self.updated_target_velocity = False
 
