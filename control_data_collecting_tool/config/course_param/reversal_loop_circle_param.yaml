@@ -6,8 +6,8 @@
     look_ahead_distance: 15.0
 
     # Data Collection Range
-    COLLECTING_DATA_V_MIN: 4.0
-    COLLECTING_DATA_V_MAX: 7.5
+    COLLECTING_DATA_V_MIN: 1.0
+    COLLECTING_DATA_V_MAX: 8.5
     COLLECTING_DATA_A_MIN: -1.0
     COLLECTING_DATA_A_MAX: 1.0
 
