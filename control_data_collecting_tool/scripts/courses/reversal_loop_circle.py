@@ -1193,7 +1193,7 @@ class Reversal_Loop_Circle(Base_Course):
             self.updated_target_velocity = True
             self.acceleration_start_time = current_time
 
-        T = 20.0  # Period of the sine wave used to modulate velocity
+        T = 30.0  # Period of the sine wave used to modulate velocity
         sine = np.sin(2 * np.pi * current_time / T)  # Sine wave for smooth velocity modulation
 
         # Handle acceleration phase

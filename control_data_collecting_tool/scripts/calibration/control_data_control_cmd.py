@@ -149,7 +149,7 @@ class MapAccuracyTester(Node):
                 lib.command.change_gear(self, "drive")
                 lib.cui.ready_check("Ready to drive?")
                 lib.cui.countdown(COUNTDOWN_TIME)
-                lib.command.accelerate(self, target_acceleration, TARGET_VELOCITY, "drive")
+                lib.command.accelerate(self, target_acceleration, TARGET_VELOCITY, "drive",break_time=60.0)
                 lib.command.accelerate(
                     self, TARGET_ACCELERATION_FOR_BRAKE, 1e-3, "brake", TARGET_JERK_FOR_BRAKE
                 )

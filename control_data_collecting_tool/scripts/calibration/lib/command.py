@@ -94,9 +94,10 @@ def change_gear(node, target_gear):
             break
 
 
-def accelerate(node, target_acceleration, target_velocity, mode, target_jerk=None):
+def accelerate(node, target_acceleration, target_velocity, mode, target_jerk=None, break_time=120.0):
     print(f"Accelerate with {target_acceleration} m/s^2.")
-
+    start_time = time.time()
+    
     if target_jerk == None:
         acceleration_cmd = target_acceleration
     else:
@@ -131,6 +132,11 @@ def accelerate(node, target_acceleration, target_velocity, mode, target_jerk=Non
                 Float32(data=float(data_collecting_control_cmd))
             )
             break
+
+        if time.time() - start_time > break_time:
+            print("break : " + str(break_time) + " has passed.")
+            break
+
     time.sleep(1)
 
 
