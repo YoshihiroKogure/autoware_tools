@@ -4,7 +4,7 @@ import pandas as pd
 import argparse
 import os 
 
-VELOCITY_AXIS = [ i * 1.39 for i in range(11)]
+VELOCITY_AXIS = [ 0,1.39,	2.78,	4.17,	5.56,	6.94,	8.33,	9.72,	11.11,	12.5, 13.89]
 ACCEL_AXIS = [ i * 0.1 for i in range(6) ]
 BRAKE_AXIS = [ i * 0.1 for i in range(9) ]
 
@@ -45,15 +45,15 @@ def optimize_brake(matrix, modified_idx):
     constraints = []
     for i in range(m):
         for j in range(n - 1):
-            constraints.append(B[i, j+ 1] <= B[i, j])  # 行方向
+            constraints.append(B[i, j+ 1] + 0.01 <= B[i, j])  # 行方向
     for i in range(m - 1):
         for j in range(n):
-            constraints.append(B[i+1, j] <= B[i, j])  # 列方向
+            constraints.append(B[i+1, j] + 0.01 <= B[i, j])  # 列方向
     
     for i in range(m):
         for j in range(n - 1):
-            if (i,j) in modified_idx:
-                objective += 1000.0*cp.sum_squares(B[i,j] - matrix[i,j])
+            if (i,j) not in modified_idx:
+                objective += 100000000.0*cp.sum_squares(B[i,j] - matrix[i,j])
                 #constraints.append(B[i, j] <= matrix[i,j] + 1e-3)
                 #constraints.append( matrix[i,j] + 1e-3 <= B[i, j])
     objective = cp.Minimize(objective)
@@ -153,12 +153,14 @@ def main():
     for i in range(len(map_[0,:])):
         map_, modified_idx_row = compute_row_neighbors_average(map_)
         modified_idx += modified_idx_row
+    
     for j in range(len(brake_map)):
         map_, modified_idx_col = compute_col_neighbors_average(map_)
         modified_idx += modified_idx_col
+    print(map_)
 
     map_ = optimize_brake(map_, modified_idx)
-    print(map_)
+    
 
     modified_accel_map_ = map_[:accel_m, :][::-1,:]
     modified_accel_map = np.zeros((len(modified_accel_map_)+1, len(modified_accel_map_[0])+1))
@@ -173,10 +175,10 @@ def main():
     modified_brake_map[0,1:] = np.array([np.round(i*1.39,2) for i in range(len(modified_brake_map_[0]))])
     modified_brake_map[1:,0] = np.array(BRAKE_AXIS)
 
-    directory_path = "modified_map"
+    directory_path = "modified_map_1"
     os.makedirs(directory_path, exist_ok=True)
-    np.savetxt("modified_map" + "/accel_map.csv", modified_accel_map, delimiter=",")
-    np.savetxt("modified_map" + "/brake_map.csv", modified_brake_map, delimiter=",")
+    np.savetxt("modified_map_1" + "/accel_map.csv", np.round(modified_accel_map,decimals=3), delimiter=",")
+    np.savetxt("modified_map_1" + "/brake_map.csv", np.round(modified_brake_map,decimals=3), delimiter=",")
 
 
 if __name__ == "__main__":

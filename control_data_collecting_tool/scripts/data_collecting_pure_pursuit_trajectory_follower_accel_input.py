@@ -518,6 +518,27 @@ class DataCollectingPurePursuitTrajectoryFollowerAccelInput(Node):
             self._previous_cmd[1] - steer_diff_limit,
             self._previous_cmd[1] + steer_diff_limit,
         )
+        # apply control_cmd limit
+        lon_acc_lim = self.get_parameter("lon_acc_lim").get_parameter_value().double_value
+        steer_lim = self.get_parameter("steer_lim").get_parameter_value().double_value
+        cmd[0] = np.clip(cmd[0], -lon_acc_lim, lon_acc_lim)
+        cmd[1] = np.clip(cmd[1], -steer_lim, steer_lim)
+        acc_diff_limit = (
+            self.get_parameter("lon_jerk_lim").get_parameter_value().double_value
+            * self.timer_period_callback
+        )
+        steer_diff_limit = (
+            self.get_parameter("steer_rate_lim").get_parameter_value().double_value
+            * self.timer_period_callback
+        )
+        cmd[0] = np.clip(
+            cmd[0], self._previous_cmd[0] - acc_diff_limit, self._previous_cmd[0] + acc_diff_limit
+        )
+        cmd[1] = np.clip(
+            cmd[1],
+            self._previous_cmd[1] - steer_diff_limit,
+            self._previous_cmd[1] + steer_diff_limit,
+        )
 
         if is_applying_control:
             self._previous_cmd = cmd.copy()

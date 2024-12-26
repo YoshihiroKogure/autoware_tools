@@ -33,11 +33,11 @@ from rclpy.node import Node
 from tier4_vehicle_msgs.msg import ActuationCommandStamped
 
 COUNTDOWN_TIME = 3  # [sec]
-TARGET_VELOCITY = 42.5  # [km/h]
+TARGET_VELOCITY = 42.5 # [km/h]
 TARGET_ACCELERATION_FOR_DRIVE = 1.5  # [m/s^2]
 TARGET_ACCELERATION_FOR_BRAKE = -1.5  # [m/s^2]
-TARGET_JERK_FOR_DRIVE = 1.5  # [m/s^3]
-TARGET_JERK_FOR_BRAKE = -1.5  # [m/s^3]
+TARGET_JERK_FOR_DRIVE = 0.5  # [m/s^3]
+TARGET_JERK_FOR_BRAKE = -0.5  # [m/s^3]
 
 MIN_ACCEL = -6.0
 MAX_ACCEL = 2.0
@@ -78,9 +78,9 @@ class MapAccuracyTester(Node):
             GearReport, "/vehicle/status/gear_status", self.on_gear_status, 1
         )
 
-        self.control_cmd_timer = self.create_timer(0.03, self.control_cmd_timer_callback)
+        '''self.control_cmd_timer = self.create_timer(0.03, self.control_cmd_timer_callback)
         self.control_cmd_timer.cancel()
-        self.target_acceleration = 0.0
+        self.target_acceleration = 0.0'''
 
         self.current_velocity = 0.0
         self.current_control_mode = ControlModeReport.MANUAL
@@ -103,19 +103,19 @@ class MapAccuracyTester(Node):
     def on_gear_status(self, msg):
         self.current_gear = msg.report
 
-    def control_cmd_timer_callback(self):
+    '''def control_cmd_timer_callback(self):
         control_cmd_msg = Control()
         control_cmd_msg.stamp = self.get_clock().now().to_msg()
         control_cmd_msg.longitudinal.acceleration = self.target_acceleration
-        self.pub_control_cmd.publish(control_cmd_msg)
+        self.pub_control_cmd.publish(control_cmd_msg)'''
 
     def run(self):
         print("===== Start map accuracy tester =====")
         lib.system.check_service_active("autoware.service")
         lib.system.check_node_active(NODE_LIST_FOR_VALIDATION)
 
-        print("===== Reset commands =====")
-        lib.command.reset_commands(self)
+        #print("===== Reset commands =====")
+        #lib.command.reset_commands(self)
 
         print("===== Start checking accel map =====")
         lib.cui.do_check("Do you want to check accel map?", lambda: self.check("accel"))
@@ -134,14 +134,6 @@ class MapAccuracyTester(Node):
                 "acceleration", min_acceleration, max_acceleration, "m/s^2"
             )
 
-            print("===== Record rosbag =====")
-            filename = self.get_rosbag_name(mode, target_acceleration)
-            process = lib.rosbag.record_ros2_bag(filename, lib.rosbag.TOPIC_LIST)
-            lib.cui.countdown(COUNTDOWN_TIME)
-            print(f"record rosbag: {filename}")
-
-            lib.cui.countdown(COUNTDOWN_TIME)
-
             if mode == "accel":
                 print(
                     f"===== Drive to {TARGET_VELOCITY} km/h with acceleration {target_acceleration} ====="
@@ -149,10 +141,17 @@ class MapAccuracyTester(Node):
                 lib.command.change_gear(self, "drive")
                 lib.cui.ready_check("Ready to drive?")
                 lib.cui.countdown(COUNTDOWN_TIME)
+                print("===== Record rosbag =====")
+                filename = self.get_rosbag_name(mode, target_acceleration)
+                process = lib.rosbag.record_ros2_bag(filename, lib.rosbag.TOPIC_LIST)
+                print(f"record rosbag: {filename}")
                 lib.command.accelerate(self, target_acceleration, TARGET_VELOCITY, "drive",break_time=60.0)
+                print("===== End rosbag record =====")
+                process.terminate()
                 lib.command.accelerate(
                     self, TARGET_ACCELERATION_FOR_BRAKE, 1e-3, "brake", TARGET_JERK_FOR_BRAKE
                 )
+                
             elif mode == "brake":
                 print(
                     f"===== Drive to {TARGET_VELOCITY} km/h and brake with {target_acceleration} ====="
@@ -167,15 +166,19 @@ class MapAccuracyTester(Node):
                     "drive",
                     TARGET_JERK_FOR_DRIVE,
                 )
+                print("===== Record rosbag =====")
+                filename = self.get_rosbag_name(mode, target_acceleration)
+                process = lib.rosbag.record_ros2_bag(filename, lib.rosbag.TOPIC_LIST)
+                print(f"record rosbag: {filename}")
                 lib.command.accelerate(self, target_acceleration, 1e-3, "brake")
+                print("===== End rosbag record =====")
+                process.terminate()
+                
             else:
                 print(f"Invalid mode: {mode}")
                 sys.exit(1)
 
-            print("===== End rosbag record =====")
-            process.terminate()
             process.wait()
-
             print("===== Validate rosbag =====")
             is_rosbag_valid = lib.rosbag.validate(filename, TOPIC_LIST_FOR_VALIDATION)
             if not is_rosbag_valid:

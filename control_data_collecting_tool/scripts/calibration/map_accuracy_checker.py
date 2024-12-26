@@ -150,6 +150,8 @@ class MapAccuracyChecker:
                 )
             )
             velocity_mps.append(velocity_status_msg.longitudinal_velocity)
+
+        print(velocity_mps)
         for control_cmd_msg in topics[CONTROL_COMMAND_TOPIC_NAME]:
             acceleration_command_time.append(
                 round(control_cmd_msg.stamp.sec + control_cmd_msg.stamp.nanosec * 1e-9, 3)
@@ -217,7 +219,7 @@ class MapAccuracyChecker:
             s=10,
             c="red",
         )
-        ax1.axvline(
+        '''ax1.axvline(
             plot_info["stamp_acceleration_start"],
             color="g",
             linestyle="--",
@@ -228,7 +230,7 @@ class MapAccuracyChecker:
             color="g",
             linestyle="--",
             label="Search section end",
-        )
+        )'''
         ax1.set_title(title, fontsize=10)
         ax1.set_ylabel("Velocity [m/s]")
         ax1.legend()
