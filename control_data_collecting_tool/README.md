@@ -133,7 +133,7 @@ This package provides tools for automatically collecting data using pure pursuit
 
     - 7.2 In the case you choose the control mode from  [`external_acceleration_cmd`, `external_actuation_cmd`].
 
-      - `external_acceleration_cmd`
+      ##### `external_acceleration_cmd`: Collect constant acceleration command data
 
         This mode enables the collection of constant acceleration data for both positive and negative acceleration scenarios.
 
@@ -221,7 +221,7 @@ This package provides tools for automatically collecting data using pure pursuit
 
           g. Completion: Once the data is recorded and the vehicle is safely stopped, the session ends. The tool validates the recorded data.
 
-      - `external_actuation_cmd`
+      ##### `external_actuation_cmd`: Collect constant actuation command data
 
         This mode enables the collection of constant accel/brake pedal input data.
 
