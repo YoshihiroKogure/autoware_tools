@@ -1,13 +1,13 @@
 ## How to calibrate Accel/Brake map
 
--  Collect constant actuation command data for map generation
+1.  Collect constant actuation command data for map generation
     Following the instruction [`external_actuation_cmd`: Collect constant actuation command data](../../README.md#external_actuation_cmd-collect-constant-actuation-command-data), please collect constant accel pedal input (0.0 ~ 0.5) data in `calibration_data/accel` and constant brake pedal input data ( 0.0 ~ 0.8 ) in `calibration_data/brake`. ROS bag files are saved where you run 
 
     ```bash
     ros2 run control_data_collecting_tool data_collecting_acceleration_cmd
     ```
 
--  Generate and modify map
+2.  Generate and modify map
     - Map generation
     ```bash
     python3 accel_brake_map_generator.py calibration_data map "default"
@@ -20,7 +20,9 @@
     ```
     By the command above, modified maps are generated in `modified_mp/`.
 
-- Collect constant acceleration input data for map accuracy check
+3. Calibrate the generated accel/brake map by autoware_accel_brake_map_calibrator following the [instruction](https://autowarefoundation.github.io/autoware.universe/main/vehicle/autoware_accel_brake_map_calibrator).
+
+4. Collect constant acceleration input data for map accuracy check
 
     Following the instruction [`external_acceleration_cmd`: Collect constant acceleration command data](../../README.md#external_acceleration_cmd-collect-constant-acceleration-command-data), please collect constant positive acceleration input data in `check_data/accel` and constant negative acceleration input data in `check_data/brake`. ROS bag files are saved where you run 
 
@@ -28,7 +30,7 @@
     ros2 run control_data_collecting_tool data_collecting_acceleration_cmd
     ```
 
-- Run accuracy check scripts``
+5. Run accuracy check scripts``
 
     ```bash
     python3 map_accuracy_checker.py check_data check_data "calibrated"
